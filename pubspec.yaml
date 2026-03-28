@@ -1,0 +1,35 @@
+name: flutter_forms_clone
+description: A production-ready Google Forms clone with Telegram Mini App integration.
+publish_to: 'none'
+version: 2.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+
+  # State management
+  provider: ^6.1.2
+  shared_preferences: ^2.3.5
+
+  # Telegram Mini App
+  telegram_web_app: 0.3.3
+
+  # UI & Utilities
+  intl: ^0.19.0
+  uuid: ^4.3.3
+  google_fonts: ^6.2.1
+  flutter_animate: ^4.5.0
+  gap: ^3.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
