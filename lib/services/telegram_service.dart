@@ -1,7 +1,4 @@
 // lib/services/telegram_service.dart
-// ─── Telegram Mini App Bridge ─────────────────────────────────────────────────
-// Wraps `telegram_web_app` package calls with graceful fallbacks for
-// running in a regular browser outside of Telegram.
 
 import 'package:flutter/foundation.dart';
 import '../../../utils/telegram_theme.dart';
@@ -13,147 +10,73 @@ class TelegramService {
   bool _initialized = false;
   bool _isTelegramContext = false;
   TelegramThemeParams _themeParams = TelegramThemeParams.light;
+  String? _initData;
+  int? _telegramUserId;
 
   bool get isTelegramContext => _isTelegramContext;
   TelegramThemeParams get themeParams => _themeParams;
+  String? get initData => _initData;
+  int? get telegramUserId => _telegramUserId;
+  int? get chatId => _telegramUserId;
 
-  /// Initialise the Telegram Web App SDK.
-  /// Safe to call on all platforms; is a no-op outside the browser.
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
-
-    if (!kIsWeb) {
-      debugPrint('[TelegramService] Not running on web – skipping TMA init.');
-      return;
-    }
-
+    if (!kIsWeb) return;
     try {
-      // ── Dynamic import to avoid compile errors on non-web targets ──────────
-      // In a real project you'd import telegram_web_app directly:
-      //
-      //   import 'package:telegram_web_app/telegram_web_app.dart';
-      //   final twa = TelegramWebApp.instance;
-      //   if (twa.isAvailable) { ... }
-      //
-      // Here we simulate the integration pattern so the code compiles
-      // without the package being installed in this scaffold:
-
-      final twaParams = await _tryGetTelegramParams();
-      if (twaParams != null) {
+      final params = await _tryGetTelegramParams();
+      if (params != null) {
         _isTelegramContext = true;
-        _themeParams = TelegramThemeParams.fromTelegramMap(twaParams);
+        _themeParams = TelegramThemeParams.fromTelegramMap(
+            params['theme'] as Map<String, dynamic>? ?? {});
+        _initData = params['initData'] as String?;
+        _telegramUserId = params['userId'] as int?;
         await _tryExpand();
-        debugPrint('[TelegramService] ✅ Running inside Telegram Mini App');
-        debugPrint('[TelegramService] Theme: ${_themeParams.brightness}');
-      } else {
-        _isTelegramContext = false;
-        // Try to honour the OS dark/light preference on the web
-        _themeParams = _detectBrowserTheme();
-        debugPrint('[TelegramService] ℹ️ Running in regular browser');
+        debugPrint('[TelegramService] In Telegram uid=$_telegramUserId');
       }
     } catch (e) {
-      debugPrint('[TelegramService] ⚠️ Init error: $e');
-      _isTelegramContext = false;
-      _themeParams = TelegramThemeParams.light;
+      debugPrint('[TelegramService] init error: $e');
     }
   }
 
-  // ── Real implementation using the telegram_web_app package ─────────────────
-  // Replace the body of this method with actual package calls:
+  // ── REAL IMPLEMENTATION ───────────────────────────────────────────────────
+  // Uncomment and replace _tryGetTelegramParams with:
   //
-  //   import 'package:telegram_web_app/telegram_web_app.dart';
+  // import 'dart:convert';
+  // import 'package:telegram_web_app/telegram_web_app.dart';
   //
-  //   Future<Map<String, dynamic>?> _tryGetTelegramParams() async {
-  //     final twa = TelegramWebApp.instance;
-  //     if (!twa.isAvailable) return null;
-  //     final params = twa.themeParams;
-  //     return {
-  //       'bg_color':              params.bgColor,
-  //       'secondary_bg_color':    params.secondaryBgColor,
-  //       'text_color':            params.textColor,
-  //       'hint_color':            params.hintColor,
-  //       'link_color':            params.linkColor,
-  //       'button_color':          params.buttonColor,
-  //       'button_text_color':     params.buttonTextColor,
-  //       'accent_text_color':     params.accentTextColor,
-  //       'destructive_text_color':params.destructiveTextColor,
-  //       'header_bg_color':       params.headerBgColor,
-  //       'section_bg_color':      params.sectionBgColor,
-  //       'section_separator_color':params.sectionSeparatorColor,
-  //     };
-  //   }
+  // Future<Map<String,dynamic>?> _tryGetTelegramParams() async {
+  //   final twa = TelegramWebApp.instance;
+  //   if (!twa.isAvailable) return null;
+  //   int? userId;
+  //   try {
+  //     final p = Uri.splitQueryString(twa.initData);
+  //     final u = p['user'];
+  //     if (u != null) userId = (jsonDecode(Uri.decodeComponent(u))['id'] as num).toInt();
+  //   } catch (_) {}
+  //   return {
+  //     'initData': twa.initData,
+  //     'userId': userId,
+  //     'theme': {
+  //       'bg_color':                twa.themeParams.bgColor,
+  //       'text_color':              twa.themeParams.textColor,
+  //       'hint_color':              twa.themeParams.hintColor,
+  //       'link_color':              twa.themeParams.linkColor,
+  //       'button_color':            twa.themeParams.buttonColor,
+  //       'button_text_color':       twa.themeParams.buttonTextColor,
+  //       'secondary_bg_color':      twa.themeParams.secondaryBgColor,
+  //       'accent_text_color':       twa.themeParams.accentTextColor,
+  //       'destructive_text_color':  twa.themeParams.destructiveTextColor,
+  //       'header_bg_color':         twa.themeParams.headerBgColor,
+  //       'section_bg_color':        twa.themeParams.sectionBgColor,
+  //       'section_separator_color': twa.themeParams.sectionSeparatorColor,
+  //     },
+  //   };
+  // }
 
-  Future<Map<String, dynamic>?> _tryGetTelegramParams() async {
-    // Stub: detects via JS interop whether window.Telegram.WebApp exists
-    // Returns null when running outside Telegram.
-    try {
-      // js.context['Telegram']?['WebApp']?['initData'] — non-empty = in TMA
-      // For actual implementation, uncomment the block above.
-      return null; // Replace with real TMA call
-    } catch (_) {
-      return null;
-    }
-  }
+  Future<Map<String, dynamic>?> _tryGetTelegramParams() async => null;
+  Future<void> _tryExpand() async {}
 
-  Future<void> _tryExpand() async {
-    try {
-      // TelegramWebApp.instance.expand();
-      debugPrint('[TelegramService] expand() called');
-    } catch (_) {}
-  }
-
-  TelegramThemeParams _detectBrowserTheme() {
-    // Could use js.context['matchMedia']('(prefers-color-scheme: dark)')
-    // to check OS preference; returns light as safe default.
-    return TelegramThemeParams.light;
-  }
-
-  /// Call when user taps the Telegram MainButton (bottom bar).
-  void setupMainButton({
-    required String text,
-    required VoidCallback onPressed,
-    bool isVisible = true,
-  }) {
-    if (!_isTelegramContext) return;
-    try {
-      // TelegramWebApp.instance.mainButton
-      //   ..text = text
-      //   ..show()
-      //   ..onClick(onPressed);
-    } catch (_) {}
-  }
-
-  void hideMainButton() {
-    if (!_isTelegramContext) return;
-    try {
-      // TelegramWebApp.instance.mainButton.hide();
-    } catch (_) {}
-  }
-
-  /// Sends form response data back to the bot via sendData.
-  void sendData(String jsonPayload) {
-    if (!_isTelegramContext) return;
-    try {
-      // TelegramWebApp.instance.sendData(jsonPayload);
-    } catch (_) {}
-  }
-
-  void close() {
-    if (!_isTelegramContext) return;
-    try {
-      // TelegramWebApp.instance.close();
-    } catch (_) {}
-  }
-
-  // ── Theme change listener (live theme switching in Telegram) ────────────────
-  void onThemeChanged(void Function(TelegramThemeParams) callback) {
-    if (!_isTelegramContext) return;
-    try {
-      // TelegramWebApp.instance.onThemeChanged(() {
-      //   final updated = TelegramThemeParams.fromTelegramMap( ... );
-      //   callback(updated);
-      // });
-    } catch (_) {}
-  }
+  void sendData(String payload) {}
+  void close() {}
 }

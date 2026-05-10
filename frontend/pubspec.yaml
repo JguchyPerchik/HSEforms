@@ -1,0 +1,25 @@
+name: hse_forms
+description: HSE Forms — survey platform (web + Telegram Mini App)
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  go_router: ^14.2.7
+  provider: ^6.1.2
+  shared_preferences: ^2.3.2
+  fl_chart: ^0.69.0
+  intl: ^0.19.0
+  web: ^1.1.0
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

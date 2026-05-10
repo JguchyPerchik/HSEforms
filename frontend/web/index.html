@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="HSE Forms — конструктор опросов НИУ ВШЭ">
+  <meta name="theme-color" content="#0F2D69">
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <title>HSE Forms</title>
+</head>
+<body>
+  <script>
+    window.tgInitData = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp.initData : "";
+    if (window.Telegram && window.Telegram.WebApp) {
+      try { window.Telegram.WebApp.ready(); window.Telegram.WebApp.expand(); } catch (e) {}
+    }
+    window.apiBase = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      ? 'http://localhost:8000'
+      : (location.origin.replace(/:\d+$/, '') + ':8000');
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

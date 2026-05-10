@@ -1,0 +1,11 @@
+{
+  "name": "HSE Forms",
+  "short_name": "HSE Forms",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#0F2D69",
+  "description": "Конструктор опросов НИУ ВШЭ",
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false
+}
