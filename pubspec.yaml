@@ -33,3 +33,18 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/fonts/
+  fonts:
+      - family: HSESans
+        fonts:
+          - asset: assets/fonts/HSESans-Thin.otf
+            weight: 100
+          - asset: assets/fonts/HSESans-Regular.otf
+            weight: 400
+          - asset: assets/fonts/HSESans-SemiBold.otf
+            weight: 600
+          - asset: assets/fonts/HSESans-Bold.otf
+            weight: 700
+          - asset: assets/fonts/HSESans-Black.otf
+            weight: 900

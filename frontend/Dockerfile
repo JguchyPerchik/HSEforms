@@ -3,6 +3,8 @@ WORKDIR /app
 COPY pubspec.yaml ./
 RUN flutter pub get
 COPY . .
+RUN mkdir -p assets/fonts  # ← временная диагностика
+RUN ls -la assets/          # ← покажет что скопировалось
 RUN flutter build web --release
 
 FROM nginx:1.27-alpine

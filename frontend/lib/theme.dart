@@ -40,8 +40,8 @@ class HseShadows {
   ];
 }
 
-const String _bodyFont = 'Manrope';
-const String _displayFont = 'Unbounded';
+const String _bodyFont = 'HSESans';
+const String _displayFont = 'HSESans';
 
 ThemeData buildHseTheme() {
   final scheme = const ColorScheme(
@@ -69,17 +69,51 @@ ThemeData buildHseTheme() {
   );
 
   final textTheme = base.textTheme.copyWith(
-    displayLarge: const TextStyle(fontFamily: _displayFont, fontSize: 44, fontWeight: FontWeight.w800, height: 1.05, color: HseColors.ink, letterSpacing: -0.5),
-    displayMedium: const TextStyle(fontFamily: _displayFont, fontSize: 34, fontWeight: FontWeight.w800, height: 1.1, color: HseColors.ink, letterSpacing: -0.3),
-    headlineLarge: const TextStyle(fontFamily: _displayFont, fontSize: 28, fontWeight: FontWeight.w700, height: 1.15, color: HseColors.ink),
-    headlineMedium: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, height: 1.2, color: HseColors.ink),
-    headlineSmall: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: HseColors.ink),
-    titleLarge: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: HseColors.ink),
-    titleMedium: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: HseColors.ink),
-    bodyLarge: const TextStyle(fontSize: 16, height: 1.45, color: HseColors.ink),
-    bodyMedium: const TextStyle(fontSize: 14.5, height: 1.45, color: HseColors.inkSoft),
-    bodySmall: const TextStyle(fontSize: 13, color: HseColors.muted),
-    labelLarge: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 0.1),
+    displayLarge: const TextStyle(
+        fontFamily: _displayFont,
+        fontSize: 44,
+        fontWeight: FontWeight.w600,
+        height: 1.05,
+        color: HseColors.ink,
+        letterSpacing: -0.5),
+    displayMedium: const TextStyle(
+        fontFamily: _displayFont,
+        fontSize: 34,
+        fontWeight: FontWeight.w600,
+        height: 1.1,
+        color: HseColors.ink,
+        letterSpacing: -0.3),
+    headlineLarge: const TextStyle(
+        fontFamily: _displayFont,
+        fontSize: 28,
+        fontWeight: FontWeight.w700,
+        height: 1.15,
+        color: HseColors.ink),
+    headlineMedium: const TextStyle(
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+        height: 1.2,
+        color: HseColors.ink),
+    headlineSmall: const TextStyle(
+        fontSize: 18, fontWeight: FontWeight.w700, color: HseColors.ink),
+    titleLarge: const TextStyle(
+        fontSize: 17, fontWeight: FontWeight.w700, color: HseColors.ink),
+    titleMedium: const TextStyle(
+        fontSize: 15, fontWeight: FontWeight.w600, color: HseColors.ink),
+    bodyLarge: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w400,
+        height: 1.45,
+        color: HseColors.ink),
+    bodyMedium: const TextStyle(
+        fontSize: 14.5,
+        fontWeight: FontWeight.w400,
+        height: 1.45,
+        color: HseColors.inkSoft),
+    bodySmall: const TextStyle(
+        fontSize: 13, fontWeight: FontWeight.w400, color: HseColors.muted),
+    labelLarge: const TextStyle(
+        fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 0.1),
   );
 
   return base.copyWith(
@@ -93,14 +127,19 @@ ThemeData buildHseTheme() {
       surfaceTintColor: Colors.transparent,
       centerTitle: false,
       toolbarHeight: 68,
-      titleTextStyle: TextStyle(fontFamily: _displayFont, fontSize: 20, fontWeight: FontWeight.w700, color: HseColors.ink),
+      titleTextStyle: TextStyle(
+          fontFamily: _displayFont,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: HseColors.ink),
       iconTheme: IconThemeData(color: HseColors.ink),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: HseColors.surface,
       hintStyle: const TextStyle(color: HseColors.muted),
-      labelStyle: const TextStyle(color: HseColors.inkSoft, fontWeight: FontWeight.w500),
+      labelStyle: const TextStyle(
+          color: HseColors.inkSoft, fontWeight: FontWeight.w500),
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(HseRadius.md),
@@ -137,8 +176,13 @@ ThemeData buildHseTheme() {
         elevation: 0,
         shadowColor: Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HseRadius.md)),
-        textStyle: const TextStyle(fontFamily: _bodyFont, fontWeight: FontWeight.w700, fontSize: 15, letterSpacing: 0.1),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(HseRadius.md)),
+        textStyle: const TextStyle(
+            fontFamily: _bodyFont,
+            fontWeight: FontWeight.w700,
+            fontSize: 15,
+            letterSpacing: 0.1),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -147,8 +191,10 @@ ThemeData buildHseTheme() {
         backgroundColor: Colors.white,
         side: const BorderSide(color: HseColors.borderStrong, width: 1.5),
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HseRadius.md)),
-        textStyle: const TextStyle(fontFamily: _bodyFont, fontWeight: FontWeight.w600, fontSize: 14.5),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(HseRadius.md)),
+        textStyle: const TextStyle(
+            fontFamily: _bodyFont, fontWeight: FontWeight.w600, fontSize: 14.5),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
@@ -156,37 +202,50 @@ ThemeData buildHseTheme() {
         foregroundColor: HseColors.primaryBright,
         textStyle: const TextStyle(fontWeight: FontWeight.w600),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HseRadius.sm)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(HseRadius.sm)),
       ),
     ),
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(
         foregroundColor: HseColors.inkSoft,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HseRadius.sm)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(HseRadius.sm)),
       ),
     ),
-    dividerTheme: const DividerThemeData(color: HseColors.border, thickness: 1, space: 1),
+    dividerTheme:
+        const DividerThemeData(color: HseColors.border, thickness: 1, space: 1),
     chipTheme: ChipThemeData(
       backgroundColor: HseColors.surface,
       selectedColor: HseColors.primary,
-      labelStyle: const TextStyle(color: HseColors.ink, fontWeight: FontWeight.w600, fontSize: 13.5),
-      secondaryLabelStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+      labelStyle: const TextStyle(
+          color: HseColors.ink, fontWeight: FontWeight.w600, fontSize: 13.5),
+      secondaryLabelStyle:
+          const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
       side: BorderSide.none,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HseRadius.md)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(HseRadius.md)),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: HseColors.ink,
-      contentTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HseRadius.md)),
+      contentTextStyle:
+          const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(HseRadius.md)),
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HseRadius.lg)),
-      titleTextStyle: const TextStyle(fontFamily: _displayFont, fontSize: 22, fontWeight: FontWeight.w700, color: HseColors.ink),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(HseRadius.lg)),
+      titleTextStyle: const TextStyle(
+          fontFamily: _displayFont,
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
+          color: HseColors.ink),
     ),
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
       backgroundColor: HseColors.primary,
@@ -194,8 +253,12 @@ ThemeData buildHseTheme() {
       elevation: 6,
     ),
     switchTheme: SwitchThemeData(
-      thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? Colors.white : Colors.white),
-      trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? HseColors.primary : HseColors.borderStrong),
+      thumbColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected) ? Colors.white : Colors.white),
+      trackColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected)
+              ? HseColors.primary
+              : HseColors.borderStrong),
       trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
     ),
   );
@@ -208,7 +271,9 @@ class GradientButton extends StatelessWidget {
   final EdgeInsets padding;
   final IconData? icon;
   const GradientButton({
-    super.key, required this.child, this.onPressed,
+    super.key,
+    required this.child,
+    this.onPressed,
     this.padding = const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
     this.icon,
   });
@@ -225,17 +290,28 @@ class GradientButton extends StatelessWidget {
             gradient: HseColors.gradient,
             borderRadius: BorderRadius.circular(HseRadius.md),
             boxShadow: const [
-              BoxShadow(color: Color(0x3315306B), blurRadius: 16, offset: Offset(0, 6)),
+              BoxShadow(
+                  color: Color(0x3315306B),
+                  blurRadius: 16,
+                  offset: Offset(0, 6)),
             ],
           ),
           child: Padding(
             padding: padding,
             child: DefaultTextStyle.merge(
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14.5, letterSpacing: 0.1),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14.5,
+                  letterSpacing: 0.1),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.max,
                 children: [
-                  if (icon != null) ...[Icon(icon, color: Colors.white, size: 18), const SizedBox(width: 8)],
+                  if (icon != null) ...[
+                    Icon(icon, color: Colors.white, size: 18),
+                    const SizedBox(width: 8)
+                  ],
                   child,
                 ],
               ),
@@ -253,7 +329,12 @@ class SoftCard extends StatelessWidget {
   final EdgeInsets padding;
   final Color? color;
   final VoidCallback? onTap;
-  const SoftCard({super.key, required this.child, this.padding = const EdgeInsets.all(20), this.color, this.onTap});
+  const SoftCard(
+      {super.key,
+      required this.child,
+      this.padding = const EdgeInsets.all(20),
+      this.color,
+      this.onTap});
   @override
   Widget build(BuildContext context) {
     final body = Container(

@@ -34,7 +34,10 @@ class _RunnerScreenState extends State<RunnerScreen> {
   bool get _isPreview => responseId == null;
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   Future<void> _load() async {
     setState(() => _busy = true);
@@ -66,7 +69,10 @@ class _RunnerScreenState extends State<RunnerScreen> {
     if (variants.isEmpty) return 0;
     // Build weighted pool: index 0 = original (weight = q.originalWeight),
     // 1..N = variants (weight = variants[i-1].weight).
-    final weights = <double>[q.originalWeight, ...variants.map((v) => v.weight.clamp(0.0, double.infinity))];
+    final weights = <double>[
+      q.originalWeight,
+      ...variants.map((v) => v.weight.clamp(0.0, double.infinity))
+    ];
     final total = weights.fold<double>(0.0, (a, b) => a + b);
     if (total <= 0) return 0;
     final rng = Random(_seed * 1000003 + q.id);
@@ -91,10 +97,13 @@ class _RunnerScreenState extends State<RunnerScreen> {
     final variants = q.readVariants();
     final v = variants[pick - 1];
     return Question(
-      id: q.id, surveyId: q.surveyId, type: v.type,
+      id: q.id,
+      surveyId: q.surveyId,
+      type: v.type,
       title: v.title.isEmpty ? q.title : v.title,
       description: v.description ?? q.description,
-      position: q.position, pageBreakBefore: q.pageBreakBefore,
+      position: q.position,
+      pageBreakBefore: q.pageBreakBefore,
       required: q.required,
       config: v.config,
       displayCondition: q.displayCondition,
@@ -128,7 +137,8 @@ class _RunnerScreenState extends State<RunnerScreen> {
       if (q.required) {
         final v = answers[q.id]?['value'];
         if (v == null || v == '' || (v is List && v.isEmpty)) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Заполните: ${q.title}')));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('Заполните: ${q.title}')));
           return false;
         }
       }
@@ -144,11 +154,14 @@ class _RunnerScreenState extends State<RunnerScreen> {
     }
     setState(() => _busy = true);
     try {
-      final list = answers.entries.map((e) => {'question_id': e.key, 'value': e.value}).toList();
+      final list = answers.entries
+          .map((e) => {'question_id': e.key, 'value': e.value})
+          .toList();
       await _api.submit(responseId!, list);
       setState(() => _done = true);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -175,9 +188,14 @@ class _RunnerScreenState extends State<RunnerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_busy && survey == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_busy && survey == null)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (_error != null) return Scaffold(body: Center(child: Text(_error!)));
-    if (survey == null) return const Scaffold(body: Center(child: Text('Опрос не найден')));
+    if (survey == null)
+      return const Scaffold(
+          body: Center(
+              child: Text('Опрос не найден',
+                  style: TextStyle(fontFamily: 'HSESans'))));
 
     final s = survey!;
     if (_done) {
@@ -196,14 +214,19 @@ class _RunnerScreenState extends State<RunnerScreen> {
                       color: _primary(s).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Icon(Icons.check_circle_rounded, color: _primary(s), size: 56),
+                    child: Icon(Icons.check_circle_rounded,
+                        color: _primary(s), size: 56),
                   ),
                   const SizedBox(height: 18),
-                  Text('Спасибо!', style: Theme.of(context).textTheme.displayMedium),
+                  Text('Спасибо!',
+                      style: Theme.of(context).textTheme.displayMedium),
                   const SizedBox(height: 6),
                   Text(
                     _isPreview ? 'Предпросмотр завершён' : 'Ваш ответ записан',
-                    style: const TextStyle(color: HseColors.muted, fontSize: 15),
+                    style: const TextStyle(
+                        fontFamily: 'HSESans',
+                        color: HseColors.muted,
+                        fontSize: 15),
                   ),
                 ]),
               ),
@@ -217,7 +240,10 @@ class _RunnerScreenState extends State<RunnerScreen> {
     if (pages.isEmpty) {
       return Scaffold(
         backgroundColor: _bg(s),
-        body: const Center(child: Text('В опросе пока нет вопросов', style: TextStyle(color: HseColors.muted))),
+        body: const Center(
+            child: Text('В опросе пока нет вопросов',
+                style:
+                    TextStyle(fontFamily: 'HSESans', color: HseColors.muted))),
       );
     }
     pageIndex = pageIndex.clamp(0, pages.length - 1);
@@ -233,91 +259,135 @@ class _RunnerScreenState extends State<RunnerScreen> {
             constraints: const BoxConstraints(maxWidth: 720),
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Container(
-                  padding: const EdgeInsets.all(28),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft, end: Alignment.bottomRight,
-                      colors: [_primary(s), _primary(s).withOpacity(0.78)],
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(28),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [_primary(s), _primary(s).withOpacity(0.78)],
+                        ),
+                        borderRadius: BorderRadius.circular(HseRadius.lg),
+                        boxShadow: HseShadows.card,
+                      ),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(s.title,
+                                style: const TextStyle(
+                                    fontFamily: 'HSESans',
+                                    color: Colors.white,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.15)),
+                            if (s.description != null &&
+                                s.description!.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Text(s.description!,
+                                  style: const TextStyle(
+                                      fontFamily: 'HSESans',
+                                      color: Colors.white70,
+                                      fontSize: 15,
+                                      height: 1.45)),
+                            ],
+                            if (s.showProgress) ...[
+                              const SizedBox(height: 18),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(999),
+                                child: LinearProgressIndicator(
+                                  value: (pageIndex + 1) / pages.length,
+                                  minHeight: 8,
+                                  backgroundColor: Colors.white24,
+                                  valueColor: const AlwaysStoppedAnimation(
+                                      Colors.white),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text('Шаг ${pageIndex + 1} из ${pages.length}',
+                                  style: const TextStyle(
+                                      fontFamily: 'HSESans',
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600)),
+                            ],
+                          ]),
                     ),
-                    borderRadius: BorderRadius.circular(HseRadius.lg),
-                    boxShadow: HseShadows.card,
-                  ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(s.title, style: const TextStyle(color: Colors.white, fontFamily: 'Unbounded', fontSize: 28, fontWeight: FontWeight.w800, height: 1.15)),
-                    if (s.description != null && s.description!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(s.description!, style: const TextStyle(color: Colors.white70, fontSize: 15, height: 1.45)),
-                    ],
-                    if (s.showProgress) ...[
-                      const SizedBox(height: 18),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(999),
-                        child: LinearProgressIndicator(
-                          value: (pageIndex + 1) / pages.length,
-                          minHeight: 8,
-                          backgroundColor: Colors.white24,
-                          valueColor: const AlwaysStoppedAnimation(Colors.white),
+                    const SizedBox(height: 16),
+                    for (final q in page)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: QuestionRenderer(
+                              question: q,
+                              value: answers[q.id],
+                              onChanged: (v) =>
+                                  setState(() => answers[q.id] = v),
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text('Шаг ${pageIndex + 1} из ${pages.length}', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
-                    ],
-                  ]),
-                ),
-                const SizedBox(height: 16),
-                for (final q in page) Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: QuestionRenderer(
-                        question: q,
-                        value: answers[q.id],
-                        onChanged: (v) => setState(() => answers[q.id] = v),
+                    const SizedBox(height: 16),
+                    Row(children: [
+                      if (s.allowBackNavigation && !isFirst)
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.arrow_back_rounded),
+                          label: const Text('Назад',
+                              style: TextStyle(fontFamily: 'HSESans')),
+                          onPressed: () => setState(() => pageIndex -= 1),
+                        ),
+                      const Spacer(),
+                      ElevatedButton.icon(
+                        icon: Icon(isLast
+                            ? Icons.check_rounded
+                            : Icons.arrow_forward_rounded),
+                        label: Text(isLast ? 'Отправить' : 'Далее'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primary(s),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 28, vertical: 16),
+                        ),
+                        onPressed: _busy
+                            ? null
+                            : () {
+                                if (!_validatePage(page)) return;
+                                if (isLast) {
+                                  _submit();
+                                } else {
+                                  setState(() => pageIndex += 1);
+                                }
+                              },
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(children: [
-                  if (s.allowBackNavigation && !isFirst) OutlinedButton.icon(
-                    icon: const Icon(Icons.arrow_back_rounded),
-                    label: const Text('Назад'),
-                    onPressed: () => setState(() => pageIndex -= 1),
-                  ),
-                  const Spacer(),
-                  ElevatedButton.icon(
-                    icon: Icon(isLast ? Icons.check_rounded : Icons.arrow_forward_rounded),
-                    label: Text(isLast ? 'Отправить' : 'Далее'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _primary(s),
-                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-                    ),
-                    onPressed: _busy ? null : () {
-                      if (!_validatePage(page)) return;
-                      if (isLast) { _submit(); }
-                      else { setState(() => pageIndex += 1); }
-                    },
-                  ),
-                ]),
-                if (_isPreview) Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: HseColors.surfaceAlt, borderRadius: BorderRadius.circular(HseRadius.md)),
-                    child: Row(children: const [
-                      Icon(Icons.visibility_outlined, color: HseColors.muted, size: 16),
-                      SizedBox(width: 8),
-                      Expanded(child: Text(
-                        'Режим предпросмотра — ответы не сохраняются. Опубликуйте опрос, чтобы собирать ответы.',
-                        style: TextStyle(color: HseColors.muted, fontSize: 12.5),
-                      )),
                     ]),
-                  ),
-                ),
-              ]),
+                    if (_isPreview)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                              color: HseColors.surfaceAlt,
+                              borderRadius:
+                                  BorderRadius.circular(HseRadius.md)),
+                          child: Row(children: const [
+                            Icon(Icons.visibility_outlined,
+                                color: HseColors.muted, size: 16),
+                            SizedBox(width: 8),
+                            Expanded(
+                                child: Text(
+                              'Режим предпросмотра — ответы не сохраняются. Опубликуйте опрос, чтобы собирать ответы.',
+                              style: TextStyle(
+                                  fontFamily: 'HSESans',
+                                  color: HseColors.muted,
+                                  fontSize: 12.5),
+                            )),
+                          ]),
+                        ),
+                      ),
+                  ]),
             ),
           ),
         ),

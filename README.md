@@ -55,12 +55,12 @@ flutter pub get
 
 ### 2. Run in browser
 ```bash
-flutter run -d chrome --web-renderer canvaskit
+flutter run -d chrome
 ```
 
 ### 3. Build for production (web)
 ```bash
-flutter build web --release --web-renderer canvaskit
+flutter build web --release
 ```
 
 Then serve the `build/web/` folder on your hosting (Cloudflare Pages, Firebase Hosting, Vercel, etc.).

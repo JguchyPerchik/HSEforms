@@ -19,16 +19,20 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _error;
 
   Future<void> _submit() async {
-    setState(() { _busy = true; _error = null; });
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
       final auth = context.read<AuthState>();
       if (_isRegister) {
-        await auth.register(_email.text.trim(), _pass.text, _name.text.trim().isEmpty ? null : _name.text.trim());
+        await auth.register(_email.text.trim(), _pass.text,
+            _name.text.trim().isEmpty ? null : _name.text.trim());
       } else {
         await auth.login(_email.text.trim(), _pass.text);
       }
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = 'Одно из полей заполнено неверно, пожалуйста, повторите попытку');
     } finally {
       setState(() => _busy = false);
     }
@@ -55,14 +59,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Container(
-                        height: 64, width: 64,
+                        height: 64,
+                        width: 64,
                         decoration: BoxDecoration(
                           gradient: HseColors.gradient,
                           borderRadius: BorderRadius.circular(18),
                         ),
                         alignment: Alignment.center,
                         child: const Text('HSE',
-                            style: TextStyle(color: Colors.white, fontFamily: 'Unbounded', fontWeight: FontWeight.w800, fontSize: 18)),
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontFamily: 'HSESans',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 24)),
                       ),
                       const SizedBox(height: 24),
                       Text(
@@ -72,23 +81,36 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 6),
                       const Text(
                         'HSE Forms — конструктор опросов с условной логикой и A/B-экспериментами.',
-                        style: TextStyle(color: HseColors.inkSoft, fontSize: 14, height: 1.4),
+                        style: TextStyle(
+                            fontFamily: 'HSESans',
+                            color: HseColors.inkSoft,
+                            fontSize: 14,
+                            height: 1.4),
                       ),
                       const SizedBox(height: 28),
                       if (_isRegister) ...[
-                        TextField(controller: _name, decoration: const InputDecoration(labelText: 'Имя', hintText: 'Как вас зовут?')),
+                        TextField(
+                            controller: _name,
+                            decoration: const InputDecoration(
+                                labelText: 'Имя', hintText: 'Как вас зовут?')),
                         const SizedBox(height: 12),
                       ],
                       TextField(
                         controller: _email,
+                        style: const TextStyle(fontFamily: 'HSESans'),
                         keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(labelText: 'Email', hintText: 'you@hse.ru'),
+                        decoration: const InputDecoration(
+                            labelText: 'Email', hintText: 'you@hse.ru', hintStyle: TextStyle(fontFamily: 'HSESans')),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: _pass,
+                        style: const TextStyle(fontFamily: 'HSESans'),
                         obscureText: true,
-                        decoration: const InputDecoration(labelText: 'Пароль', hintText: 'Минимум 8 символов'),
+                        decoration: const InputDecoration(
+                            labelText: 'Пароль',
+                            hintText: 'Минимум 8 символов',
+                            hintStyle: TextStyle(fontFamily: 'HSESans')),
                         onSubmitted: (_) => _submit(),
                       ),
                       if (_error != null) ...[
@@ -100,27 +122,42 @@ class _LoginScreenState extends State<LoginScreen> {
                             borderRadius: BorderRadius.circular(HseRadius.sm),
                           ),
                           child: Row(children: [
-                            const Icon(Icons.error_outline_rounded, color: HseColors.danger, size: 18),
+                            const Icon(Icons.error_outline_rounded,
+                                color: HseColors.danger, size: 18),
                             const SizedBox(width: 8),
-                            Expanded(child: Text(_error!, style: const TextStyle(color: HseColors.danger, fontSize: 13))),
+                            Expanded(
+                                child: Text(_error!,
+                                    style: const TextStyle(
+                                        fontFamily: 'HSESans',
+                                        color: HseColors.danger,
+                                        fontSize: 13))),
                           ]),
                         ),
                       ],
                       const SizedBox(height: 22),
                       GradientButton(
                         onPressed: _busy ? null : _submit,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Center(
-                          child: Text(
-                            _busy ? '...' : (_isRegister ? 'Создать аккаунт' : 'Войти'),
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
-                          ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          _busy
+                              ? '...'
+                              : (_isRegister ? 'Создать аккаунт' : 'Войти'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontFamily: 'HSESans',
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 18),
                         ),
                       ),
                       const SizedBox(height: 8),
                       TextButton(
-                        onPressed: () => setState(() => _isRegister = !_isRegister),
-                        child: Text(_isRegister ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться'),
+                        onPressed: () =>
+                            setState(() => _isRegister = !_isRegister),
+                        child: Text(_isRegister
+                            ? 'Уже есть аккаунт? Войти'
+                            : 'Нет аккаунта? Зарегистрироваться',
+                            style: const TextStyle(fontFamily: 'HSESans')),
                       ),
                     ],
                   ),
@@ -140,10 +177,14 @@ class _BackgroundPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint1 = Paint()..color = HseColors.primary.withOpacity(0.08);
     final paint2 = Paint()..color = HseColors.primaryBright.withOpacity(0.06);
-    canvas.drawCircle(Offset(size.width * 0.15, size.height * 0.2), 220, paint1);
-    canvas.drawCircle(Offset(size.width * 0.85, size.height * 0.85), 280, paint2);
-    canvas.drawCircle(Offset(size.width * 0.9, size.height * 0.15), 120, paint1);
+    canvas.drawCircle(
+        Offset(size.width * 0.15, size.height * 0.2), 220, paint1);
+    canvas.drawCircle(
+        Offset(size.width * 0.85, size.height * 0.85), 280, paint2);
+    canvas.drawCircle(
+        Offset(size.width * 0.9, size.height * 0.15), 120, paint1);
   }
+
   @override
   bool shouldRepaint(_) => false;
 }

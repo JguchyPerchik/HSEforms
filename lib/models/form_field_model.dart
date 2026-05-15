@@ -300,7 +300,7 @@ class FormSchema {
       final ans = answers[f.id];
       if (ans == null) return false;
       if (ans is String) return ans.isNotEmpty;
-      if (ans is List) return (ans as List).isNotEmpty;
+      if (ans is List) return (ans).isNotEmpty;
       return true;
     }).length;
     return answered / interactive.length;

@@ -43,7 +43,9 @@ class _BuilderScreenState extends State<BuilderScreen> {
   @override
   void dispose() {
     _titleSaveTimer?.cancel();
-    for (final t in _qSaveTimers.values) { t.cancel(); }
+    for (final t in _qSaveTimers.values) {
+      t.cancel();
+    }
     _titleCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
@@ -66,7 +68,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
     _titleSaveTimer = Timer(const Duration(milliseconds: 600), () async {
       if (survey == null) return;
       try {
-        await _api.update(survey!.id, {'title': survey!.title, 'description': survey!.description});
+        await _api.update(survey!.id,
+            {'title': survey!.title, 'description': survey!.description});
       } catch (_) {}
     });
   }
@@ -101,7 +104,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Не удалось сохранить вопрос: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Не удалось сохранить вопрос: $e')));
       }
     }
   }
@@ -113,10 +117,20 @@ class _BuilderScreenState extends State<BuilderScreen> {
       'page_break_before': false,
       'required': false,
       'config': type == QuestionType.scale
-          ? {'min': 1, 'max': 5, 'show_ticks': true, 'show_value': true, 'show_bounds': true}
+          ? {
+              'min': 1,
+              'max': 5,
+              'show_ticks': true,
+              'show_value': true,
+              'show_bounds': true
+            }
           : <String, dynamic>{},
-      'options': (type == QuestionType.single_choice || type == QuestionType.multiple_choice || type == QuestionType.dropdown)
-          ? [{'label': '', 'value': '', 'position': 0}]
+      'options': (type == QuestionType.single_choice ||
+              type == QuestionType.multiple_choice ||
+              type == QuestionType.dropdown)
+          ? [
+              {'label': '', 'value': '', 'position': 0}
+            ]
           : [],
     });
     setState(() {
@@ -151,12 +165,16 @@ class _BuilderScreenState extends State<BuilderScreen> {
   }
 
   Future<void> _publishToggle() async {
-    final next = survey!.status == SurveyStatus.published ? 'draft' : 'published';
+    final next =
+        survey!.status == SurveyStatus.published ? 'draft' : 'published';
     final s = await _api.update(widget.surveyId, {'status': next});
     setState(() => survey = s);
     if (mounted && next == 'published') {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: const Text('Опубликовано! Поделитесь ссылкой через кнопку «Поделиться».')),
+        SnackBar(
+            content: const Text(
+                'Опубликовано! Поделитесь ссылкой через кнопку «Поделиться».',
+                style: TextStyle(fontFamily: 'HSESans'))),
       );
     }
   }
@@ -171,8 +189,10 @@ class _BuilderScreenState extends State<BuilderScreen> {
     );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Создан «Вариант $letter». Открыть для редактирования?'),
-        action: SnackBarAction(label: 'Открыть', onPressed: () => context.go('/builder/${v.id}')),
+        content: Text('Создан «Вариант $letter». Открыть для редактирования?',
+            style: TextStyle(fontFamily: 'HSESans')),
+        action: SnackBarAction(
+            label: 'Открыть', onPressed: () => context.go('/builder/${v.id}')),
       ));
     }
     await _load();
@@ -187,10 +207,16 @@ class _BuilderScreenState extends State<BuilderScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Удалить вариант?'),
-        content: const Text('Уже собранные ответы по этому варианту тоже удалятся.'),
+        title: const Text('Удалить вариант?',
+            style: TextStyle(fontFamily: 'HSESans')),
+        content: const Text(
+            'Уже собранные ответы по этому варианту тоже удалятся.',
+            style: TextStyle(fontFamily: 'HSESans')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Отмена',
+                  style: TextStyle(fontFamily: 'HSESans'))),
           TextButton(
             style: TextButton.styleFrom(foregroundColor: HseColors.danger),
             onPressed: () => Navigator.pop(context, true),
@@ -216,7 +242,10 @@ class _BuilderScreenState extends State<BuilderScreen> {
     final qs = survey!.questions;
     int startOfThisPage = 0;
     for (int k = index; k >= 1; k--) {
-      if (qs[k].pageBreakBefore) { startOfThisPage = k; break; }
+      if (qs[k].pageBreakBefore) {
+        startOfThisPage = k;
+        break;
+      }
     }
     if (startOfThisPage == 0) return const [];
     return qs.sublist(0, startOfThisPage);
@@ -227,7 +256,11 @@ class _BuilderScreenState extends State<BuilderScreen> {
     if (_busy && survey == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    if (survey == null) return const Scaffold(body: Center(child: Text('Опрос не найден')));
+    if (survey == null)
+      return const Scaffold(
+          body: Center(
+              child: Text('Опрос не найден',
+                  style: TextStyle(fontFamily: 'HSESans'))));
     final s = survey!;
     final wide = MediaQuery.of(context).size.width > 980;
     final published = s.status == SurveyStatus.published;
@@ -242,20 +275,32 @@ class _BuilderScreenState extends State<BuilderScreen> {
         ),
         title: TextField(
           controller: _titleCtrl,
-          style: const TextStyle(fontFamily: 'Unbounded', fontSize: 20, fontWeight: FontWeight.w700, color: HseColors.ink),
+          style: const TextStyle(
+              fontFamily: 'HSESans',
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: HseColors.ink),
           decoration: const InputDecoration(
-            border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
-            filled: false, hintText: 'Название опроса',
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            filled: false,
+            hintText: 'Название опроса',
+            hintStyle: TextStyle(fontFamily: 'HSESans'),
             contentPadding: EdgeInsets.zero,
           ),
-          onChanged: (v) { s.title = v; _scheduleTitleSave(); },
+          onChanged: (v) {
+            s.title = v;
+            _scheduleTitleSave();
+          },
         ),
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: TextButton.icon(
               icon: const Icon(Icons.ios_share_rounded, size: 18),
-              label: const Text('Поделиться'),
+              label: const Text('Поделиться',
+                  style: TextStyle(fontFamily: 'HSESans')),
               onPressed: _openShare,
             ),
           ),
@@ -272,7 +317,9 @@ class _BuilderScreenState extends State<BuilderScreen> {
           IconButton(
             icon: const Icon(Icons.people_outline_rounded),
             tooltip: 'Соавторы',
-            onPressed: () => showDialog(context: context, builder: (_) => CollaboratorsDialog(surveyId: s.id)),
+            onPressed: () => showDialog(
+                context: context,
+                builder: (_) => CollaboratorsDialog(surveyId: s.id)),
           ),
           const SizedBox(width: 8),
           Padding(
@@ -280,13 +327,15 @@ class _BuilderScreenState extends State<BuilderScreen> {
             child: published
                 ? OutlinedButton.icon(
                     icon: const Icon(Icons.pause_rounded, size: 18),
-                    label: const Text('В черновик'),
+                    label: const Text('В черновик',
+                        style: TextStyle(fontFamily: 'HSESans')),
                     onPressed: _publishToggle,
                   )
                 : GradientButton(
                     icon: Icons.rocket_launch_rounded,
                     onPressed: _publishToggle,
-                    child: const Text('Опубликовать'),
+                    child: const Text('Опубликовать',
+                        style: TextStyle(fontFamily: 'HSESans')),
                   ),
           ),
         ],
@@ -308,11 +357,17 @@ class _BuilderScreenState extends State<BuilderScreen> {
                       style: const TextStyle(fontSize: 15, height: 1.45),
                       decoration: const InputDecoration(
                         hintText: 'Добавьте описание опроса (необязательно)',
-                        border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
+                        hintStyle: TextStyle(fontFamily: 'HSESans'),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
                         filled: false,
                       ),
                       maxLines: null,
-                      onChanged: (v) { s.description = v; _scheduleTitleSave(); },
+                      onChanged: (v) {
+                        s.description = v;
+                        _scheduleTitleSave();
+                      },
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -327,12 +382,17 @@ class _BuilderScreenState extends State<BuilderScreen> {
                               color: HseColors.surfaceAlt,
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            child: const Icon(Icons.auto_awesome_rounded, color: HseColors.primary, size: 36),
+                            child: const Icon(Icons.auto_awesome_rounded,
+                                color: HseColors.primary, size: 36),
                           ),
                           const SizedBox(height: 16),
-                          Text('Добавьте первый вопрос', style: Theme.of(context).textTheme.headlineSmall),
+                          Text('Добавьте первый вопрос',
+                              style: Theme.of(context).textTheme.headlineSmall),
                           const SizedBox(height: 6),
-                          const Text('Выберите тип в правой панели →', style: TextStyle(color: HseColors.muted)),
+                          const Text('Выберите тип в правой панели →',
+                              style: TextStyle(
+                                  fontFamily: 'HSESans',
+                                  color: HseColors.muted)),
                         ]),
                       ),
                     )
@@ -354,12 +414,16 @@ class _BuilderScreenState extends State<BuilderScreen> {
                             question: s.questions[i],
                             availableTriggers: _availableTriggers(i),
                             expanded: _expandedQid == s.questions[i].id,
-                            onTap: () => setState(() =>
-                                _expandedQid = _expandedQid == s.questions[i].id ? null : s.questions[i].id),
-                            onChanged: (q) => setState(() => s.questions[i] = q),
+                            onTap: () => setState(() => _expandedQid =
+                                _expandedQid == s.questions[i].id
+                                    ? null
+                                    : s.questions[i].id),
+                            onChanged: (q) =>
+                                setState(() => s.questions[i] = q),
                             onSave: () => _scheduleQuestionSave(s.questions[i]),
                             onDelete: () => _deleteQuestion(s.questions[i]),
-                            onTogglePageBreak: i == 0 ? null : () => _togglePageBreak(i),
+                            onTogglePageBreak:
+                                i == 0 ? null : () => _togglePageBreak(i),
                           ),
                       ],
                     ),
@@ -368,51 +432,66 @@ class _BuilderScreenState extends State<BuilderScreen> {
             ),
           ),
         ),
-        if (wide) Container(
-          width: 340,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(left: BorderSide(color: HseColors.border)),
-          ),
-          child: SurveySettingsPanel(
-            survey: s,
-            onAddQuestion: _addQuestion,
-            onSettingsChanged: (data) async {
-              final updated = await _api.update(s.id, data);
-              setState(() => survey = updated);
-            },
-            onCreateVariant: _createVariant,
-            onOpenVariant: (vid) => context.go('/builder/$vid'),
-            onChangeVariantWeight: _changeVariantWeight,
-            onDeleteVariant: _deleteVariant,
-          ),
-        ),
-      ]),
-      floatingActionButton: wide ? null : FloatingActionButton.extended(
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Вопрос'),
-        onPressed: () => showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-          builder: (_) => DraggableScrollableSheet(
-            expand: false,
-            initialChildSize: 0.85,
-            builder: (_, scroll) => SurveySettingsPanel(
+        if (wide)
+          Container(
+            width: 340,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(left: BorderSide(color: HseColors.border)),
+            ),
+            child: SurveySettingsPanel(
               survey: s,
-              onAddQuestion: (t) { Navigator.pop(context); _addQuestion(t); },
+              onAddQuestion: _addQuestion,
               onSettingsChanged: (data) async {
                 final updated = await _api.update(s.id, data);
                 setState(() => survey = updated);
               },
-              onCreateVariant: () async { Navigator.pop(context); await _createVariant(); },
-              onOpenVariant: (vid) { Navigator.pop(context); context.go('/builder/$vid'); },
+              onCreateVariant: _createVariant,
+              onOpenVariant: (vid) => context.go('/builder/$vid'),
               onChangeVariantWeight: _changeVariantWeight,
               onDeleteVariant: _deleteVariant,
             ),
           ),
-        ),
-      ),
+      ]),
+      floatingActionButton: wide
+          ? null
+          : FloatingActionButton.extended(
+              icon: const Icon(Icons.add_rounded),
+              label:
+                  const Text('Вопрос', style: TextStyle(fontFamily: 'HSESans')),
+              onPressed: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                shape: const RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(24))),
+                builder: (_) => DraggableScrollableSheet(
+                  expand: false,
+                  initialChildSize: 0.85,
+                  builder: (_, scroll) => SurveySettingsPanel(
+                    survey: s,
+                    onAddQuestion: (t) {
+                      Navigator.pop(context);
+                      _addQuestion(t);
+                    },
+                    onSettingsChanged: (data) async {
+                      final updated = await _api.update(s.id, data);
+                      setState(() => survey = updated);
+                    },
+                    onCreateVariant: () async {
+                      Navigator.pop(context);
+                      await _createVariant();
+                    },
+                    onOpenVariant: (vid) {
+                      Navigator.pop(context);
+                      context.go('/builder/$vid');
+                    },
+                    onChangeVariantWeight: _changeVariantWeight,
+                    onDeleteVariant: _deleteVariant,
+                  ),
+                ),
+              ),
+            ),
     );
   }
 }
@@ -423,19 +502,41 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (bg, fg, label, icon) = switch (status) {
-      SurveyStatus.draft => (HseColors.surfaceAlt, HseColors.inkSoft, 'Черновик', Icons.edit_note_rounded),
-      SurveyStatus.published => (const Color(0x1A2E9D6E), HseColors.success, 'Опубликован', Icons.public_rounded),
-      SurveyStatus.closed => (const Color(0x1AE05656), HseColors.danger, 'Закрыт', Icons.lock_outline_rounded),
+      SurveyStatus.draft => (
+          HseColors.surfaceAlt,
+          HseColors.inkSoft,
+          'Черновик',
+          Icons.edit_note_rounded
+        ),
+      SurveyStatus.published => (
+          const Color(0x1A2E9D6E),
+          HseColors.success,
+          'Опубликован',
+          Icons.public_rounded
+        ),
+      SurveyStatus.closed => (
+          const Color(0x1AE05656),
+          HseColors.danger,
+          'Закрыт',
+          Icons.lock_outline_rounded
+        ),
     };
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+        decoration:
+            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(icon, size: 14, color: fg),
           const SizedBox(width: 6),
-          Text(label, style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 12)),
+          Text(label,
+              style: TextStyle(
+                  fontFamily: 'HSESans',
+                  color: fg,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                  fontSize: 12)),
         ]),
       ),
     );

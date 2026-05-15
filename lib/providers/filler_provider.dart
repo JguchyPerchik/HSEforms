@@ -80,7 +80,7 @@ class FillerProvider extends ChangeNotifier {
         case ValidationRule.required:
           if (answer == null ||
               (answer is String && answer.trim().isEmpty) ||
-              (answer is List && (answer as List).isEmpty)) return v.errorMessage;
+              (answer is List && (answer).isEmpty)) return v.errorMessage;
           break;
         case ValidationRule.minLength:
           final min = v.value as int? ?? 0;

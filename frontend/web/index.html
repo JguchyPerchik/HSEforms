@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <base href="$FLUTTER_BASE_HREF">
   <meta charset="UTF-8">
@@ -9,23 +10,64 @@
   <meta name="theme-color" content="#0F2D69">
 
   <link rel="manifest" href="manifest.json">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    @font-face {
+      font-family: 'HSESans';
+      src: url('assets/fonts/HSESans-Thin.otf') format('opentype');
+      font-weight: 100;
+      font-style: normal;
+    }
+
+    @font-face {
+      font-family: 'HSESans';
+      src: url('assets/fonts/HSESans-Regular.otf') format('opentype');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    @font-face {
+      font-family: 'HSESans';
+      src: url('assets/fonts/HSESans-Italic.otf') format('opentype');
+      font-weight: 400;
+      font-style: italic;
+    }
+
+    @font-face {
+      font-family: 'HSESans';
+      src: url('assets/fonts/HSESans-SemiBold.otf') format('opentype');
+      font-weight: 600;
+      font-style: normal;
+    }
+
+    @font-face {
+      font-family: 'HSESans';
+      src: url('assets/fonts/HSESans-Bold.otf') format('opentype');
+      font-weight: 700;
+      font-style: normal;
+    }
+
+    @font-face {
+      font-family: 'HSESans';
+      src: url('assets/fonts/HSESans-Black.otf') format('opentype');
+      font-weight: 900;
+      font-style: normal;
+    }
+  </style>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
   <title>HSE Forms</title>
 </head>
+
 <body>
   <script>
     window.tgInitData = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp.initData : "";
     if (window.Telegram && window.Telegram.WebApp) {
-      try { window.Telegram.WebApp.ready(); window.Telegram.WebApp.expand(); } catch (e) {}
+      try { window.Telegram.WebApp.ready(); window.Telegram.WebApp.expand(); } catch (e) { }
     }
-    window.apiBase = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-      ? 'http://localhost:8000'
-      : (location.origin.replace(/:\d+$/, '') + ':8000');
+    window.apiBase = 'https://wrapped-conf-operating-por.trycloudflare.com';
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
+
 </html>

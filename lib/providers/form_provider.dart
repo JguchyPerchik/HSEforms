@@ -92,7 +92,7 @@ class FormProvider extends ChangeNotifier {
       final ans = _answers[f.id];
       if (ans == null) return false;
       if (ans is String) return ans.isNotEmpty;
-      if (ans is List) return (ans as List).isNotEmpty;
+      if (ans is List) return (ans).isNotEmpty;
       return true;
     }).length;
     return answered / interactiveFields.length;
@@ -122,7 +122,7 @@ class FormProvider extends ChangeNotifier {
         case ValidationRule.required:
           if (answer == null ||
               (answer is String && answer.trim().isEmpty) ||
-              (answer is List && (answer as List).isEmpty)) {
+              (answer is List && (answer).isEmpty)) {
             return validation.errorMessage;
           }
           break;
