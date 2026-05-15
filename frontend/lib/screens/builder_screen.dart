@@ -105,7 +105,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Не удалось сохранить вопрос: $e')));
+            SnackBar(content: Text('Не удалось сохранить вопрос: $e', style: TextStyle(fontFamily: 'HSESans'))));
       }
     }
   }

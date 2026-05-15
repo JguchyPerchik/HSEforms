@@ -191,8 +191,9 @@ class FormProvider extends ChangeNotifier {
           .millisecondsSinceEpoch
           .toString(), // 1. Добавляем ID (например, на основе времени)
       formId: _schema!.id,
-      formTitle:
-          _schema!.title ?? 'Untitled Form', // 2. Добавляем заголовок из схемы
+      formTitle: _schema!.title.isNotEmpty
+          ? _schema!.title
+          : 'Untitled Form',// 2. Добавляем заголовок из схемы
       answers: Map<String, dynamic>.from(_answers),
       submittedAt: DateTime.now(),
     );

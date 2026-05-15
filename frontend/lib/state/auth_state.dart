@@ -16,7 +16,7 @@ class AuthState extends ChangeNotifier {
       try { user = await _auth.me(); } catch (_) { await client.setToken(null); }
     }
     final initData = tgInitData;
-    if (!client.isAuthed && initData != null && initData.isNotEmpty) {
+    if (!client.isAuthed && initData.isNotEmpty) {
       try {
         final tok = await _auth.telegram(initData);
         await client.setToken(tok);

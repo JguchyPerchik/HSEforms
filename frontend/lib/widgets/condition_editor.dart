@@ -11,8 +11,10 @@ class ConditionEditor extends StatefulWidget {
   final void Function(Map<String, dynamic>?) onChanged;
 
   const ConditionEditor({
-    super.key, required this.question,
-    required this.previousQuestions, required this.onChanged,
+    super.key,
+    required this.question,
+    required this.previousQuestions,
+    required this.onChanged,
   });
 
   @override
@@ -29,7 +31,8 @@ class _ConditionEditorState extends State<ConditionEditor> {
     final cond = widget.question.displayCondition;
     enabled = cond != null;
     clauses = enabled
-        ? List<Map<String, dynamic>>.from((cond!['all'] ?? cond['any'] ?? []) as List)
+        ? List<Map<String, dynamic>>.from(
+            (cond!['all'] ?? cond['any'] ?? []) as List)
         : [];
   }
 
@@ -49,18 +52,24 @@ class _ConditionEditorState extends State<ConditionEditor> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        color: HseColors.surface, borderRadius: BorderRadius.circular(8),
+        color: HseColors.surface,
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
+        Row(mainAxisSize: MainAxisSize.min, children: [
           Switch(
             value: enabled,
             activeColor: HseColors.secondary,
-            onChanged: (v) { setState(() => enabled = v); _emit(); },
+            onChanged: (v) {
+              setState(() => enabled = v);
+              _emit();
+            },
           ),
-          const Text('Показывать только если…', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(width: 6),
+          const Text('Показывать только если…',
+              style: TextStyle(fontWeight: FontWeight.w600)),
         ]),
         if (enabled) ...[
           const SizedBox(height: 8),
@@ -70,10 +79,10 @@ class _ConditionEditorState extends State<ConditionEditor> {
             label: const Text('Добавить условие'),
             onPressed: () {
               setState(() => clauses.add({
-                'question_id': widget.previousQuestions.first.id,
-                'op': 'eq',
-                'value': '',
-              }));
+                    'question_id': widget.previousQuestions.first.id,
+                    'op': 'eq',
+                    'value': '',
+                  }));
               _emit();
             },
           ),
@@ -94,51 +103,83 @@ class _ConditionEditorState extends State<ConditionEditor> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(children: [
-        Expanded(flex: 3, child: DropdownButtonFormField<int>(
-          value: refQ.id,
-          isExpanded: true,
-          decoration: const InputDecoration(isDense: true),
-          items: widget.previousQuestions.map((q) =>
-              DropdownMenuItem(value: q.id, child: Text(q.title.isEmpty ? '#${q.id}' : q.title, overflow: TextOverflow.ellipsis))).toList(),
-          onChanged: (v) { setState(() => c['question_id'] = v); _emit(); },
-        )),
+        Expanded(
+            flex: 3,
+            child: DropdownButtonFormField<int>(
+              value: refQ.id,
+              isExpanded: true,
+              decoration: const InputDecoration(isDense: true),
+              items: widget.previousQuestions
+                  .map((q) => DropdownMenuItem(
+                      value: q.id,
+                      child: Text(q.title.isEmpty ? '#${q.id}' : q.title,
+                          overflow: TextOverflow.ellipsis)))
+                  .toList(),
+              onChanged: (v) {
+                setState(() => c['question_id'] = v);
+                _emit();
+              },
+            )),
         const SizedBox(width: 8),
-        Expanded(flex: 2, child: DropdownButtonFormField<String>(
-          value: c['op'] as String? ?? 'eq',
-          isExpanded: true,
-          decoration: const InputDecoration(isDense: true),
-          items: const [
-            DropdownMenuItem(value: 'eq', child: Text('=')),
-            DropdownMenuItem(value: 'neq', child: Text('≠')),
-            DropdownMenuItem(value: 'gt', child: Text('>')),
-            DropdownMenuItem(value: 'lt', child: Text('<')),
-            DropdownMenuItem(value: 'contains', child: Text('содержит')),
-            DropdownMenuItem(value: 'answered', child: Text('заполнено')),
-            DropdownMenuItem(value: 'not_answered', child: Text('не заполнено')),
-          ],
-          onChanged: (v) { setState(() => c['op'] = v); _emit(); },
-        )),
+        Expanded(
+            flex: 2,
+            child: DropdownButtonFormField<String>(
+              value: c['op'] as String? ?? 'eq',
+              isExpanded: true,
+              decoration: const InputDecoration(isDense: true),
+              items: const [
+                DropdownMenuItem(value: 'eq', child: Text('=')),
+                DropdownMenuItem(value: 'neq', child: Text('≠')),
+                DropdownMenuItem(value: 'gt', child: Text('>')),
+                DropdownMenuItem(value: 'lt', child: Text('<')),
+                DropdownMenuItem(value: 'contains', child: Text('содержит')),
+                DropdownMenuItem(value: 'answered', child: Text('заполнено')),
+                DropdownMenuItem(
+                    value: 'not_answered', child: Text('не заполнено')),
+              ],
+              onChanged: (v) {
+                setState(() => c['op'] = v);
+                _emit();
+              },
+            )),
         const SizedBox(width: 8),
-        Expanded(flex: 3, child: hasOptions && (c['op'] == 'eq' || c['op'] == 'neq')
-            ? DropdownButtonFormField<String>(
-                value: refQ.options.any((o) => o.value == c['value']) ? c['value'] as String? : null,
-                isExpanded: true,
-                decoration: const InputDecoration(isDense: true),
-                items: refQ.options.map((o) =>
-                    DropdownMenuItem(value: o.value, child: Text(o.label, overflow: TextOverflow.ellipsis))).toList(),
-                onChanged: (v) { c['value'] = v; _emit(); },
-              )
-            : (c['op'] == 'answered' || c['op'] == 'not_answered'
-                ? const SizedBox.shrink()
-                : TextFormField(
-                    initialValue: c['value']?.toString() ?? '',
-                    decoration: const InputDecoration(isDense: true, hintText: 'значение'),
-                    onChanged: (v) { c['value'] = v; },
-                    onTapOutside: (_) => _emit(),
-                  ))),
+        Expanded(
+            flex: 3,
+            child: hasOptions && (c['op'] == 'eq' || c['op'] == 'neq')
+                ? DropdownButtonFormField<String>(
+                    value: refQ.options.any((o) => o.value == c['value'])
+                        ? c['value'] as String?
+                        : null,
+                    isExpanded: true,
+                    decoration: const InputDecoration(isDense: true),
+                    items: refQ.options
+                        .map((o) => DropdownMenuItem(
+                            value: o.value,
+                            child:
+                                Text(o.label, overflow: TextOverflow.ellipsis)))
+                        .toList(),
+                    onChanged: (v) {
+                      c['value'] = v;
+                      _emit();
+                    },
+                  )
+                : (c['op'] == 'answered' || c['op'] == 'not_answered'
+                    ? const SizedBox.shrink()
+                    : TextFormField(
+                        initialValue: c['value']?.toString() ?? '',
+                        decoration: const InputDecoration(
+                            isDense: true, hintText: 'значение'),
+                        onChanged: (v) {
+                          c['value'] = v;
+                        },
+                        onTapOutside: (_) => _emit(),
+                      ))),
         IconButton(
           icon: const Icon(Icons.close, size: 18, color: HseColors.muted),
-          onPressed: () { setState(() => clauses.removeAt(i)); _emit(); },
+          onPressed: () {
+            setState(() => clauses.removeAt(i));
+            _emit();
+          },
         ),
       ]),
     );

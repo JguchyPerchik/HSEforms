@@ -90,29 +90,34 @@ ThemeData buildHseTheme() {
         height: 1.15,
         color: HseColors.ink),
     headlineMedium: const TextStyle(
+        fontFamily: _displayFont,
         fontSize: 22,
         fontWeight: FontWeight.w700,
         height: 1.2,
         color: HseColors.ink),
     headlineSmall: const TextStyle(
-        fontSize: 18, fontWeight: FontWeight.w700, color: HseColors.ink),
+        fontFamily: _bodyFont, fontSize: 18, fontWeight: FontWeight.w700, color: HseColors.ink),
     titleLarge: const TextStyle(
-        fontSize: 17, fontWeight: FontWeight.w700, color: HseColors.ink),
+        fontFamily: _bodyFont, fontSize: 17, fontWeight: FontWeight.w700, color: HseColors.ink),
     titleMedium: const TextStyle(
-        fontSize: 15, fontWeight: FontWeight.w600, color: HseColors.ink),
+        fontFamily: _bodyFont, fontSize: 15, fontWeight: FontWeight.w600, color: HseColors.ink),
     bodyLarge: const TextStyle(
+        fontFamily: _bodyFont,
         fontSize: 16,
         fontWeight: FontWeight.w400,
         height: 1.45,
         color: HseColors.ink),
     bodyMedium: const TextStyle(
+        fontFamily: _bodyFont,
         fontSize: 14.5,
         fontWeight: FontWeight.w400,
         height: 1.45,
         color: HseColors.inkSoft),
     bodySmall: const TextStyle(
+        fontFamily: _bodyFont,
         fontSize: 13, fontWeight: FontWeight.w400, color: HseColors.muted),
     labelLarge: const TextStyle(
+        fontFamily: _bodyFont,
         fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 0.1),
   );
 
@@ -137,7 +142,7 @@ ThemeData buildHseTheme() {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: HseColors.surface,
-      hintStyle: const TextStyle(color: HseColors.muted),
+      hintStyle: const TextStyle(fontFamily: _displayFont, color: HseColors.muted),
       labelStyle: const TextStyle(
           color: HseColors.inkSoft, fontWeight: FontWeight.w500),
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
@@ -200,7 +205,7 @@ ThemeData buildHseTheme() {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: HseColors.primaryBright,
-        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(fontFamily: _displayFont, fontWeight: FontWeight.w600),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(HseRadius.sm)),
@@ -219,9 +224,9 @@ ThemeData buildHseTheme() {
       backgroundColor: HseColors.surface,
       selectedColor: HseColors.primary,
       labelStyle: const TextStyle(
-          color: HseColors.ink, fontWeight: FontWeight.w600, fontSize: 13.5),
+          fontFamily: _displayFont, color: HseColors.ink, fontWeight: FontWeight.w600, fontSize: 13.5),
       secondaryLabelStyle:
-          const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          const TextStyle(fontFamily: _displayFont, color: Colors.white, fontWeight: FontWeight.w600),
       side: BorderSide.none,
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(HseRadius.md)),
@@ -231,7 +236,7 @@ ThemeData buildHseTheme() {
       behavior: SnackBarBehavior.floating,
       backgroundColor: HseColors.ink,
       contentTextStyle:
-          const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+          const TextStyle(fontFamily: _displayFont, color: Colors.white, fontWeight: FontWeight.w500),
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(HseRadius.md)),
     ),
@@ -300,6 +305,7 @@ class GradientButton extends StatelessWidget {
             padding: padding,
             child: DefaultTextStyle.merge(
               style: const TextStyle(
+                  fontFamily: _displayFont,
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
                   fontSize: 14.5,

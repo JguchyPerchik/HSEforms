@@ -73,8 +73,8 @@ class SurveySettingsPanel extends StatelessWidget {
             ]),
             const SizedBox(height: 6),
             const Text(
-              'Создайте 2+ вариантов опроса. Респонденту по ссылке покажется случайный вариант '
-              'с вероятностью пропорционально его весу.',
+              'Создайте 2+ вариантов опроса. Респонденту будет показан случайный вариант '
+              'с вероятностью, пропорциональной установленному весу.',
               style: TextStyle(color: HseColors.inkSoft, fontSize: 13, height: 1.4),
             ),
           ]),
