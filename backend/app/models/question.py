@@ -13,12 +13,12 @@ class QuestionType(str, enum.Enum):
     multiple_choice = "multiple_choice"
     dropdown = "dropdown"
     scale = "scale"
-    rating = "rating"
-    number = "number"
-    date = "date"
-    time = "time"
-    email = "email"
-    file_upload = "file_upload"
+    # rating = "rating"
+    # number = "number"
+    # date = "date"
+    # time = "time"
+    # email = "email"
+    # file_upload = "file_upload"
     section_header = "section_header"
 
 

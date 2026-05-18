@@ -548,16 +548,16 @@ class QuestionTypePicker extends StatelessWidget {
         return Icons.expand_circle_down_outlined;
       case QuestionType.scale:
         return Icons.linear_scale_rounded;
-      case QuestionType.rating:
-        return Icons.star_outline_rounded;
-      case QuestionType.number:
-        return Icons.numbers_rounded;
-      case QuestionType.date:
-        return Icons.calendar_today_rounded;
-      case QuestionType.email:
-        return Icons.alternate_email_rounded;
+      // case QuestionType.rating:
+      //   return Icons.star_outline_rounded;
+      // case QuestionType.number:
+      //   return Icons.numbers_rounded;
+      // case QuestionType.date:
+      //   return Icons.calendar_today_rounded;
+      // case QuestionType.email:
+      //   return Icons.alternate_email_rounded;
       case QuestionType.section_header:
-        return Icons.title_rounded;
+         return Icons.title_rounded;
     }
   }
 

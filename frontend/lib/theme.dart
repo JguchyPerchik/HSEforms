@@ -96,11 +96,20 @@ ThemeData buildHseTheme() {
         height: 1.2,
         color: HseColors.ink),
     headlineSmall: const TextStyle(
-        fontFamily: _bodyFont, fontSize: 18, fontWeight: FontWeight.w700, color: HseColors.ink),
+        fontFamily: _bodyFont,
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: HseColors.ink),
     titleLarge: const TextStyle(
-        fontFamily: _bodyFont, fontSize: 17, fontWeight: FontWeight.w700, color: HseColors.ink),
+        fontFamily: _bodyFont,
+        fontSize: 17,
+        fontWeight: FontWeight.w700,
+        color: HseColors.ink),
     titleMedium: const TextStyle(
-        fontFamily: _bodyFont, fontSize: 15, fontWeight: FontWeight.w600, color: HseColors.ink),
+        fontFamily: _bodyFont,
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        color: HseColors.ink),
     bodyLarge: const TextStyle(
         fontFamily: _bodyFont,
         fontSize: 16,
@@ -115,10 +124,14 @@ ThemeData buildHseTheme() {
         color: HseColors.inkSoft),
     bodySmall: const TextStyle(
         fontFamily: _bodyFont,
-        fontSize: 13, fontWeight: FontWeight.w400, color: HseColors.muted),
+        fontSize: 13,
+        fontWeight: FontWeight.w400,
+        color: HseColors.muted),
     labelLarge: const TextStyle(
         fontFamily: _bodyFont,
-        fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 0.1),
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.1),
   );
 
   return base.copyWith(
@@ -142,7 +155,8 @@ ThemeData buildHseTheme() {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: HseColors.surface,
-      hintStyle: const TextStyle(fontFamily: _displayFont, color: HseColors.muted),
+      hintStyle:
+          const TextStyle(fontFamily: _displayFont, color: HseColors.muted),
       labelStyle: const TextStyle(
           color: HseColors.inkSoft, fontWeight: FontWeight.w500),
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
@@ -205,7 +219,8 @@ ThemeData buildHseTheme() {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: HseColors.primaryBright,
-        textStyle: const TextStyle(fontFamily: _displayFont, fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(
+            fontFamily: _displayFont, fontWeight: FontWeight.w600),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(HseRadius.sm)),
@@ -224,9 +239,14 @@ ThemeData buildHseTheme() {
       backgroundColor: HseColors.surface,
       selectedColor: HseColors.primary,
       labelStyle: const TextStyle(
-          fontFamily: _displayFont, color: HseColors.ink, fontWeight: FontWeight.w600, fontSize: 13.5),
-      secondaryLabelStyle:
-          const TextStyle(fontFamily: _displayFont, color: Colors.white, fontWeight: FontWeight.w600),
+          fontFamily: _displayFont,
+          color: HseColors.ink,
+          fontWeight: FontWeight.w600,
+          fontSize: 13.5),
+      secondaryLabelStyle: const TextStyle(
+          fontFamily: _displayFont,
+          color: Colors.white,
+          fontWeight: FontWeight.w600),
       side: BorderSide.none,
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(HseRadius.md)),
@@ -235,8 +255,10 @@ ThemeData buildHseTheme() {
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: HseColors.ink,
-      contentTextStyle:
-          const TextStyle(fontFamily: _displayFont, color: Colors.white, fontWeight: FontWeight.w500),
+      contentTextStyle: const TextStyle(
+          fontFamily: _displayFont,
+          color: Colors.white,
+          fontWeight: FontWeight.w500),
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(HseRadius.md)),
     ),
@@ -269,17 +291,17 @@ ThemeData buildHseTheme() {
   );
 }
 
-/// Reusable gradient pill button for hero CTAs (publish, share, etc.).
 class GradientButton extends StatelessWidget {
   final Widget child;
   final VoidCallback? onPressed;
   final EdgeInsets padding;
   final IconData? icon;
+
   const GradientButton({
     super.key,
     required this.child,
     this.onPressed,
-    this.padding = const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+    this.padding = const EdgeInsets.symmetric(horizontal: 22),
     this.icon,
   });
 
@@ -301,25 +323,32 @@ class GradientButton extends StatelessWidget {
                   offset: Offset(0, 6)),
             ],
           ),
-          child: Padding(
-            padding: padding,
-            child: DefaultTextStyle.merge(
-              style: const TextStyle(
-                  fontFamily: _displayFont,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14.5,
-                  letterSpacing: 0.1),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.max,
-                children: [
-                  if (icon != null) ...[
-                    Icon(icon, color: Colors.white, size: 18),
-                    const SizedBox(width: 8)
-                  ],
-                  child,
-                ],
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 52),
+            child: Padding(
+              padding: padding,
+              child: Center(
+                child: DefaultTextStyle.merge(
+                  style: const TextStyle(
+                      fontFamily: _displayFont,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14.5,
+                      height: 1,
+                      letterSpacing: 0.1),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      if (icon != null) ...[
+                        Icon(icon, color: Colors.white, size: 18),
+                        const SizedBox(width: 8)
+                      ],
+                      child,
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

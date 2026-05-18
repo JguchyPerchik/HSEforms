@@ -1,6 +1,7 @@
 enum QuestionType {
   short_text, long_text, single_choice, multiple_choice,
-  dropdown, scale, rating, number, date, email, section_header;
+  dropdown, scale, section_header;
+  // rating, number, date, email, section_header
 
   static QuestionType parse(String s) =>
       QuestionType.values.firstWhere((e) => e.name == s, orElse: () => QuestionType.short_text);
@@ -13,10 +14,10 @@ enum QuestionType {
       case QuestionType.multiple_choice: return 'Несколько вариантов';
       case QuestionType.dropdown: return 'Выпадающий список';
       case QuestionType.scale: return 'Шкала';
-      case QuestionType.rating: return 'Оценка';
-      case QuestionType.number: return 'Число';
-      case QuestionType.date: return 'Дата';
-      case QuestionType.email: return 'Email';
+      // case QuestionType.rating: return 'Оценка';
+      // case QuestionType.number: return 'Число';
+      // case QuestionType.date: return 'Дата';
+      // case QuestionType.email: return 'Email';
       case QuestionType.section_header: return 'Заголовок секции';
     }
   }

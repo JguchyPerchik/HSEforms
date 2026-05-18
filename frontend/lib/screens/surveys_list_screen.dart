@@ -274,12 +274,17 @@ class _SurveyCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: SoftCard(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.only(
+          top: 10,
+          left: 20,
+          right: 20,
+          bottom: 20,
+        ),
         onTap: onOpen,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
               decoration: BoxDecoration(
                   color: _statusColor.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(999)),
@@ -288,52 +293,59 @@ class _SurveyCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Text(survey.status.human,
                     style: TextStyle(
+                        fontFamily: 'HSESans',
                         color: _statusColor,
                         fontWeight: FontWeight.w700,
-                        fontSize: 11.5)),
+                        fontSize: 13)),
               ]),
             ),
             const Spacer(),
-            IconButton(
-                icon: const Icon(Icons.ios_share_rounded),
-                tooltip: 'Поделиться',
-                onPressed: onShare),
-            IconButton(
-                icon: const Icon(Icons.bar_chart_rounded),
-                tooltip: 'Аналитика',
-                onPressed: onAnalytics),
-            IconButton(
-                icon: const Icon(Icons.visibility_outlined),
-                tooltip: 'Предпросмотр',
-                onPressed: onPreview),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_horiz_rounded),
-              onSelected: (v) {
-                if (v == 'duplicate') onDuplicate();
-                if (v == 'delete') onDelete();
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                    value: 'duplicate',
-                    child: Row(children: [
-                      Icon(Icons.copy_rounded, size: 18),
-                      SizedBox(width: 10),
-                      Text('Дублировать')
-                    ])),
-                PopupMenuItem(
-                    value: 'delete',
-                    child: Row(children: [
-                      Icon(Icons.delete_outline_rounded,
-                          size: 18, color: HseColors.danger),
-                      SizedBox(width: 10),
-                      Text('Удалить',
-                          style: TextStyle(
-                              fontFamily: 'HSESans', color: HseColors.danger))
-                    ])),
-              ],
+            SizedBox(
+              height: 36,
+              child: Row(children: [
+                IconButton(
+                    icon: const Icon(Icons.ios_share_rounded),
+                    tooltip: 'Поделиться',
+                    onPressed: onShare),
+                IconButton(
+                    icon: const Icon(Icons.bar_chart_rounded),
+                    tooltip: 'Аналитика',
+                    onPressed: onAnalytics),
+                IconButton(
+                    icon: const Icon(Icons.visibility_outlined),
+                    tooltip: 'Предпросмотр',
+                    onPressed: onPreview),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_horiz_rounded),
+                  onSelected: (v) {
+                    if (v == 'duplicate') onDuplicate();
+                    if (v == 'delete') onDelete();
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                        value: 'duplicate',
+                        child: Row(children: [
+                          Icon(Icons.copy_rounded, size: 18),
+                          SizedBox(width: 10),
+                          Text('Дублировать')
+                        ])),
+                    PopupMenuItem(
+                        value: 'delete',
+                        child: Row(children: [
+                          Icon(Icons.delete_outline_rounded,
+                              size: 18, color: HseColors.danger),
+                          SizedBox(width: 10),
+                          Text('Удалить',
+                              style: TextStyle(
+                                  fontFamily: 'HSESans',
+                                  color: HseColors.danger))
+                        ])),
+                  ],
+                ),
+              ]),
             ),
           ]),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             survey.title.isEmpty ? 'Без названия' : survey.title,
             style: const TextStyle(

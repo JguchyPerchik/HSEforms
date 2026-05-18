@@ -499,6 +499,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
 class _StatusBadge extends StatelessWidget {
   final SurveyStatus status;
   const _StatusBadge({required this.status});
+
   @override
   Widget build(BuildContext context) {
     final (bg, fg, label, icon) = switch (status) {
@@ -524,11 +525,15 @@ class _StatusBadge extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration:
-            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 14, color: fg),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration:BoxDecoration(
+        color: bg, 
+        borderRadius: BorderRadius.circular(999)),
+        child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, size: 16, color: fg),
           const SizedBox(width: 6),
           Text(label,
               style: TextStyle(
@@ -536,7 +541,8 @@ class _StatusBadge extends StatelessWidget {
                   color: fg,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.2,
-                  fontSize: 12)),
+                  fontSize: 14,
+                  height: 1)),
         ]),
       ),
     );

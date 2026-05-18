@@ -45,13 +45,13 @@ class QuestionRenderer extends StatelessWidget {
       case QuestionType.section_header:
         return const SizedBox.shrink();
       case QuestionType.short_text:
-      case QuestionType.email:
-        return TextFormField(
-          initialValue: v?.toString() ?? '',
-          keyboardType: q.type == QuestionType.email ? TextInputType.emailAddress : TextInputType.text,
-          decoration: const InputDecoration(hintText: 'Ваш ответ'),
-          onChanged: _set,
-        );
+      // case QuestionType.email:
+      //   return TextFormField(
+      //     initialValue: v?.toString() ?? '',
+      //     keyboardType: q.type == QuestionType.email ? TextInputType.emailAddress : TextInputType.text,
+      //     decoration: const InputDecoration(hintText: 'Ваш ответ'),
+      //     onChanged: _set,
+      //   );
       case QuestionType.long_text:
         return TextFormField(
           initialValue: v?.toString() ?? '',
@@ -59,25 +59,25 @@ class QuestionRenderer extends StatelessWidget {
           decoration: const InputDecoration(hintText: 'Ваш ответ'),
           onChanged: _set,
         );
-      case QuestionType.number:
-        return TextFormField(
-          initialValue: v?.toString() ?? '',
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(hintText: '0'),
-          onChanged: (s) => _set(double.tryParse(s)),
-        );
-      case QuestionType.date:
-        return OutlinedButton.icon(
-          icon: const Icon(Icons.calendar_today, size: 18),
-          label: Text(v?.toString() ?? 'Выбрать дату'),
-          onPressed: () async {
-            final d = await showDatePicker(
-              context: context, initialDate: DateTime.now(),
-              firstDate: DateTime(1900), lastDate: DateTime(2100),
-            );
-            if (d != null) _set('${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}');
-          },
-        );
+      // case QuestionType.number:
+      //   return TextFormField(
+      //     initialValue: v?.toString() ?? '',
+      //     keyboardType: TextInputType.number,
+      //     decoration: const InputDecoration(hintText: '0'),
+      //     onChanged: (s) => _set(double.tryParse(s)),
+      //   );
+      // case QuestionType.date:
+      //   return OutlinedButton.icon(
+      //     icon: const Icon(Icons.calendar_today, size: 18),
+      //     label: Text(v?.toString() ?? 'Выбрать дату'),
+      //     onPressed: () async {
+      //       final d = await showDatePicker(
+      //         context: context, initialDate: DateTime.now(),
+      //         firstDate: DateTime(1900), lastDate: DateTime(2100),
+      //       );
+      //       if (d != null) _set('${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}');
+      //     },
+      //   );
       case QuestionType.single_choice:
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           for (final o in q.options) RadioListTile<String>(
@@ -147,12 +147,12 @@ class QuestionRenderer extends StatelessWidget {
             ),
           ),
         ]);
-      case QuestionType.rating:
-        final cur = (v is num) ? v.toInt() : 0;
-        return Row(children: List.generate(5, (i) => IconButton(
-          icon: Icon(i < cur ? Icons.star : Icons.star_border, color: HseColors.secondary, size: 32),
-          onPressed: () => _set(i + 1),
-        )));
+      // case QuestionType.rating:
+      //   final cur = (v is num) ? v.toInt() : 0;
+      //   return Row(children: List.generate(5, (i) => IconButton(
+      //     icon: Icon(i < cur ? Icons.star : Icons.star_border, color: HseColors.secondary, size: 32),
+      //     onPressed: () => _set(i + 1),
+      //   )));
     }
   }
 }

@@ -52,7 +52,7 @@ class SurveySettingsPanel extends StatelessWidget {
         ),
         _Setting(
           title: 'Прогресс-бар',
-          subtitle: 'Показывать сколько осталось страниц',
+          subtitle: 'Показывать, сколько осталось страниц',
           value: survey.showProgress,
           onChanged: (v) => onSettingsChanged({'show_progress': v}),
         ),
@@ -73,7 +73,7 @@ class SurveySettingsPanel extends StatelessWidget {
             ]),
             const SizedBox(height: 6),
             const Text(
-              'Создайте 2+ вариантов опроса. Респонденту будет показан случайный вариант '
+              'Создайте 2+ вариантов опроса. Респонденту будет показан один из вариантов '
               'с вероятностью, пропорциональной установленному весу.',
               style: TextStyle(color: HseColors.inkSoft, fontSize: 13, height: 1.4),
             ),
@@ -116,8 +116,7 @@ class SurveySettingsPanel extends StatelessWidget {
                 border: Border.all(color: HseColors.border, style: BorderStyle.solid, width: 1),
               ),
               child: const Text(
-                'Нажмите «Добавить» — создастся копия опроса. Отредактируйте её, '
-                'и при открытии ссылки респондентам будет случайно показан один из вариантов.',
+                'Нажмите «Добавить», чтобы создать копию текущего опроса. ',
                 style: TextStyle(color: HseColors.muted, fontSize: 12.5, height: 1.4),
               ),
             )
@@ -211,10 +210,10 @@ class _QuestionTypeChip extends StatelessWidget {
       case QuestionType.multiple_choice: return Icons.check_box_outlined;
       case QuestionType.dropdown: return Icons.expand_circle_down_outlined;
       case QuestionType.scale: return Icons.linear_scale_rounded;
-      case QuestionType.rating: return Icons.star_outline_rounded;
-      case QuestionType.number: return Icons.numbers_rounded;
-      case QuestionType.date: return Icons.calendar_today_rounded;
-      case QuestionType.email: return Icons.alternate_email_rounded;
+      // case QuestionType.rating: return Icons.star_outline_rounded;
+      // case QuestionType.number: return Icons.numbers_rounded;
+      // case QuestionType.date: return Icons.calendar_today_rounded;
+      // case QuestionType.email: return Icons.alternate_email_rounded;
       case QuestionType.section_header: return Icons.title_rounded;
     }
   }
