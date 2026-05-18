@@ -98,9 +98,19 @@ class _BuilderScreenState extends State<BuilderScreen> {
         }).toList(),
       });
       if (!mounted) return;
+      // CRITICAL: do NOT replace the local Question object with the server
+      // response. Between issuing the save and receiving it, the user may have
+      // typed more — those keystrokes mutated the local Question and its
+      // options. Replacing the reference would discard them AND invalidate
+      // every ObjectKey/identityHashCode-based widget key under this question,
+      // causing State (and TextEditingController text) to be wiped.
+      //
+      // We only need server-assigned IDs for newly created options so that
+      // the next save can drop the temporary negative IDs. Patch them in place.
       setState(() {
-        final i = survey!.questions.indexWhere((x) => x.id == q.id);
-        if (i >= 0) survey!.questions[i] = updated;
+        for (int k = 0; k < q.options.length && k < updated.options.length; k++) {
+          q.options[k].id = updated.options[k].id;
+        }
       });
     } catch (e) {
       if (mounted) {
