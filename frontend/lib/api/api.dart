@@ -89,6 +89,16 @@ class PublicApi {
   Future<Map<String, dynamic>> start(String slug) async =>
       Map<String, dynamic>.from(await c.post('/public/surveys/$slug/start'));
 
-  Future<Map<String, dynamic>> submit(int responseId, List<Map<String, dynamic>> answers) async =>
-      Map<String, dynamic>.from(await c.post('/public/responses/$responseId/submit', {'answers': answers}));
+  Future<Map<String, dynamic>> submit(
+    int responseId,
+    List<Map<String, dynamic>> answers, {
+    Map<String, int> variantAssignments = const {},
+  }) async =>
+      Map<String, dynamic>.from(await c.post(
+        '/public/responses/$responseId/submit',
+        {
+          'answers': answers,
+          'variant_assignments': variantAssignments,
+        },
+      ));
 }

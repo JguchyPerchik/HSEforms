@@ -157,7 +157,10 @@ class _RunnerScreenState extends State<RunnerScreen> {
       final list = answers.entries
           .map((e) => {'question_id': e.key, 'value': e.value})
           .toList();
-      await _api.submit(responseId!, list);
+      final assignments = <String, int>{
+        for (final entry in _variantAssignment.entries) entry.key.toString(): entry.value,
+      };
+      await _api.submit(responseId!, list, variantAssignments: assignments);
       setState(() => _done = true);
     } catch (e) {
       ScaffoldMessenger.of(context)
