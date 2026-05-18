@@ -41,6 +41,16 @@ class _BuilderScreenState extends State<BuilderScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant BuilderScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.surveyId != widget.surveyId) {
+      _expandedQid = null;
+      _load();
+    }
+  }
+
+  @override
   void dispose() {
     _titleSaveTimer?.cancel();
     for (final t in _qSaveTimers.values) {
@@ -198,38 +208,67 @@ class _BuilderScreenState extends State<BuilderScreen> {
     await _load();
   }
 
-  Future<void> _changeVariantWeight(int variantId, double weight) async {
-    await _api.update(variantId, {'variant_weight': weight});
-    await _load();
-  }
-
-  Future<void> _deleteVariant(int variantId) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Удалить вариант?',
-            style: TextStyle(fontFamily: 'HSESans')),
-        content: const Text(
-            'Уже собранные ответы по этому варианту тоже удалятся.',
-            style: TextStyle(fontFamily: 'HSESans')),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Отмена',
-                  style: TextStyle(fontFamily: 'HSESans'))),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: HseColors.danger),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Удалить'),
-          ),
-        ],
+Future<void> _deleteVariant(int variantId) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text(
+        'Удалить вариант?',
+        style: TextStyle(fontFamily: 'HSESans'),
       ),
-    );
-    if (ok == true) {
-      await _api.delete(variantId);
-      await _load();
+      content: const Text(
+        'Уже собранные ответы по этому варианту тоже удалятся.',
+        style: TextStyle(fontFamily: 'HSESans'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text(
+            'Отмена',
+            style: TextStyle(fontFamily: 'HSESans'),
+          ),
+        ),
+        TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: HseColors.danger,
+          ),
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('Удалить'),
+        ),
+      ],
+    ),
+  );
+
+  if (ok == true) {
+    await _api.delete(variantId);
+
+    _expandedQid = null;
+
+    await _load();
+
+    if (mounted) {
+      setState(() {});
     }
   }
+}
+
+Future<void> _changeVariantWeight(
+  int variantId,
+  double weight,
+) async {
+  await _api.update(
+    variantId,
+    {
+      'variant_weight': weight,
+    },
+  );
+
+  await _load();
+
+  if (mounted) {
+    setState(() {});
+  }
+}
 
   void _openShare() {
     showDialog(context: context, builder: (_) => ShareDialog(survey: survey!));

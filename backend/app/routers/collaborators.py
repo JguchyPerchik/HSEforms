@@ -42,14 +42,14 @@ async def add_collaborator(
 ) -> CollaboratorOut:
     survey = await get_survey_or_404(db, survey_id)
     if survey.owner_id != user.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Только владелец управляет коллабораторами")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "У вас нет прав на управление командой. Назначать соавторов может только владелец опроса.")
 
     res = await db.execute(select(User).where(User.email == data.email))
     target = res.scalar_one_or_none()
     if not target:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Пользователь не найден")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Пользователь с таким email не найден в системе. Сначала ему нужно зарегистрироваться.")
     if target.id == survey.owner_id:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Это владелец опроса")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Вы являетесь создателем этого опроса, вас нельзя добавить в список соавторов.")
 
     existing = await db.execute(
         select(SurveyCollaborator).where(
@@ -77,7 +77,7 @@ async def remove_collaborator(
 ) -> None:
     survey = await get_survey_or_404(db, survey_id)
     if survey.owner_id != user.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Только владелец")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Удалять участников из команды проекта может только его владелец.")
     res = await db.execute(
         select(SurveyCollaborator).where(
             SurveyCollaborator.survey_id == survey_id, SurveyCollaborator.user_id == user_id

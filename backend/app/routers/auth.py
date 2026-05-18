@@ -45,7 +45,7 @@ async def login(
     res = await db.execute(select(User).where(User.email == data.email))
     user = res.scalar_one_or_none()
     if not user or not user.password_hash or not verify_password(data.password, user.password_hash):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверный email или пароль")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверный email или пароль.")
     return TokenOut(access_token=create_access_token(user.id))
 
 
@@ -58,11 +58,11 @@ async def telegram_auth(
 ) -> TokenOut:
     parsed = parse_init_data(data.init_data)
     if not parsed:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверный initData")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Не удалось безопасно войти через Telegram. Похоже, сессия устарела. Попробуйте перезапустить приложение.")
     tg_user = parsed.get("user") or {}
     tg_id = tg_user.get("id")
     if not tg_id:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Нет user в initData")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Telegram не передал данные вашего профиля. Проверьте настройки конфиденциальности в мессенджере.")
     res = await db.execute(select(User).where(User.telegram_id == tg_id))
     user = res.scalar_one_or_none()
     if not user:

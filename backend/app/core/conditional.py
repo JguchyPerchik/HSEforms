@@ -1,14 +1,15 @@
 """Server-side evaluator for question display conditions.
 
 Rule shape:
-    {"all": [<clause>, ...]}        -> AND
-    {"any": [<clause>, ...]}        -> OR
-    {"not": <rule>}                 -> negate
+    {"all": [<clause>, ...]}    -> AND
+    {"any": [<clause>, ...]}    -> OR
+    {"not": <rule>}             -> negate
     <clause>: {"question_id": int, "op": str, "value": any}
 
 Operators: eq, neq, gt, gte, lt, lte, in, not_in, contains, answered, not_answered.
 Answer values follow the question schema and are normalized via _scalar().
 """
+
 from typing import Any
 
 

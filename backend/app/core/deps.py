@@ -12,14 +12,14 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db),
 ) -> User:
     if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing bearer token")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Пожалуйста, войдите в систему, чтобы продолжить.")
     token = authorization.split(" ", 1)[1].strip()
     payload = decode_token(token)
     if not payload or "sub" not in payload:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Ваша рабочая сессия устарела или недействительна. Пожалуйста, авторизуйтесь заново.")
     user = await db.get(User, int(payload["sub"]))
     if not user:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Аккаунт не найден. Возможно, ваш профиль был удален.")
     return user
 
 

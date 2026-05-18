@@ -47,16 +47,16 @@ class Survey(Base):
             "border": "#C6C6C6",
             "surface": "#E6E6E6",
             "background": "#FFFFFF",
-            "font": "Inter",
+            "font": "HSESans",
         },
     )
-
+    # A/B tests
     parent_survey_id: Mapped[int | None] = mapped_column(
         ForeignKey("surveys.id", ondelete="CASCADE"), nullable=True, index=True
     )
     variant_weight: Mapped[float] = mapped_column(Float, default=1.0)
     variant_label: Mapped[str | None] = mapped_column(String(100), nullable=True)
-
+    #
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
