@@ -28,6 +28,10 @@ class Response(Base):
     # Filled by /submit from client-side deterministic picks.
     variant_assignments: Mapped[dict] = mapped_column(JSONB, default=dict)
 
+    # AI-generated synthetic respondent marker + the persona dict that produced it.
+    is_synthetic: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    synthetic_profile: Mapped[dict] = mapped_column(JSONB, default=dict)
+
     answers: Mapped[list["Answer"]] = relationship(
         back_populates="response", cascade="all, delete-orphan"
     )

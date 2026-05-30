@@ -12,5 +12,20 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str = ""
     CORS_ORIGINS: str = "*"
 
+    # LLM provider for synthetic respondents.
+    # "groq"       — fast, generous free tier (30 RPM, 14400 RPD), recommended
+    # "openrouter" — gateway to many models, including free + paid
+    LLM_PROVIDER: str = "groq"
+    LLM_DEFAULT_MODEL: str = "llama-3.3-70b-versatile"  # Groq's default
+
+    # Per-provider keys (only the matching one needs to be set).
+    GROQ_API_KEY: str = ""
+    OPENROUTER_API_KEY: str = ""
+
+    SYNTHETIC_MAX_PER_REQUEST: int = 50
+    # Groq free tier: 30 req/min — concurrency 3 безопасно.
+    # OpenRouter free tier: ~1 req/20s per provider — лучше 1.
+    SYNTHETIC_CONCURRENCY: int = 3
+
 
 settings = Settings()

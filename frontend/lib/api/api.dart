@@ -78,6 +78,24 @@ class SurveysApi {
 
   Future<void> removeCollaborator(int surveyId, int userId) async =>
       c.delete('/surveys/$surveyId/collaborators/$userId');
+
+  /// Generate `count` synthetic respondents driven by the given persona.
+  /// The backend calls OpenRouter, parses the JSON, and writes Answers as if
+  /// real respondents submitted them (Response.is_synthetic = true).
+  Future<Map<String, dynamic>> runSynthetic(
+    int surveyId, {
+    required Map<String, dynamic> persona,
+    required int count,
+    String? model,
+  }) async {
+    final body = <String, dynamic>{
+      'persona': persona,
+      'count': count,
+      if (model != null && model.isNotEmpty) 'model': model,
+    };
+    final r = await c.post('/surveys/$surveyId/synthetic/run', body);
+    return Map<String, dynamic>.from(r);
+  }
 }
 
 class PublicApi {

@@ -11,6 +11,7 @@ import '../widgets/question_editor.dart';
 import '../widgets/survey_settings_panel.dart';
 import '../widgets/collaborators_dialog.dart';
 import '../widgets/share_dialog.dart';
+import '../widgets/synthetic_dialog.dart';
 
 class BuilderScreen extends StatefulWidget {
   final int surveyId;
@@ -330,6 +331,13 @@ class _BuilderScreenState extends State<BuilderScreen> {
             onPressed: () => showDialog(
                 context: context,
                 builder: (_) => CollaboratorsDialog(surveyId: s.id)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.smart_toy_outlined),
+            tooltip: 'AI-респонденты',
+            onPressed: s.questions.isEmpty ? null : () => showDialog(
+                context: context,
+                builder: (_) => SyntheticDialog(surveyId: s.id)),
           ),
           const SizedBox(width: 8),
           Padding(
