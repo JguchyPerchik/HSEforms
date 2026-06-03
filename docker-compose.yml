@@ -3,10 +3,11 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: hse
-      POSTGRES_PASSWORD: hse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hse}
       POSTGRES_DB: hse_forms
-    ports:
-      - "5432:5432"
+    # Порт 5432 НЕ пробрасываем наружу: Postgres доступен только из
+    # внутренней docker-сети. Для локального доступа используйте
+    # `docker compose exec db psql ...` или временный override.
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -17,8 +18,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # 6379 тоже наружу не пробрасываем — Redis ходит только между сервисами.
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s
@@ -33,17 +33,16 @@ services:
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://hse:hse@db:5432/hse_forms
+      DATABASE_URL: postgresql+asyncpg://hse:${POSTGRES_PASSWORD:-hse}@db:5432/hse_forms
       REDIS_URL: redis://redis:6379/0
-      JWT_SECRET: change-me-in-prod-please
-      TELEGRAM_BOT_TOKEN: ""
-      CORS_ORIGINS: "*"
-      LLM_PROVIDER: ${LLM_PROVIDER:-groq}
-      LLM_DEFAULT_MODEL: ${LLM_DEFAULT_MODEL:-llama-3.3-70b-versatile}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-    ports:
-      - "8000:8000"
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-prod-please}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      # Один домен и для фронта, и для /api — CORS можно держать пустым,
+      # но на всякий случай разрешаем именно прод-домен.
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://forms.example.com}
+    # Порт 8000 наружу больше не торчит — фронт ходит на бэк через
+    # внутренний DNS docker-сети (`backend:8000`), а наружу всё идёт через
+    # Caddy на 443/80.
     volumes:
       - ./backend:/app
 
@@ -52,7 +51,18 @@ services:
     depends_on:
       - backend
     ports:
-      - "8080:80"
+      - "80:80"      # нужен для ACME-challenge Let's Encrypt + редиректа на https
+      - "443:443"
+    volumes:
+      # Монтируем Caddyfile — можно править домен и перезапускать без rebuild.
+      - ./frontend/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Постоянное хранилище для сертификатов и метаданных Caddy. Без этого
+      # при каждом `docker compose down/up` Caddy будет запрашивать у
+      # Let's Encrypt новый сертификат и быстро упрётся в rate-limit.
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:

@@ -14,7 +14,13 @@ from ..models import (
     User,
     Question,
 )
-from ..schemas.survey import SurveyCreate, SurveyDetail, SurveySummary, SurveyUpdate, SurveyVariantOut
+from ..schemas.survey import (
+    SurveyCreate,
+    SurveyDetail,
+    SurveySummary,
+    SurveyUpdate,
+    SurveyVariantOut,
+)
 from ..schemas.question import QuestionOut
 from ..core.deps import get_current_user
 from ..core.permissions import get_survey_or_404, require_role

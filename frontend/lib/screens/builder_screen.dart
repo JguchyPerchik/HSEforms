@@ -11,7 +11,6 @@ import '../widgets/question_editor.dart';
 import '../widgets/survey_settings_panel.dart';
 import '../widgets/collaborators_dialog.dart';
 import '../widgets/share_dialog.dart';
-import '../widgets/synthetic_dialog.dart';
 
 class BuilderScreen extends StatefulWidget {
   final int surveyId;
@@ -273,12 +272,155 @@ class _BuilderScreenState extends State<BuilderScreen> {
               child: Text('Опрос не найден',
                   style: TextStyle(fontFamily: 'HSESans'))));
     final s = survey!;
-    final wide = MediaQuery.of(context).size.width > 980;
+    final width = MediaQuery.of(context).size.width;
+    final wide = width > 980;
+    final compact = width < 720;
     final published = s.status == SurveyStatus.published;
+
+    // Полный набор действий — раскладывается по-разному для desktop/mobile.
+    final shareAction = compact
+        ? IconButton(
+            icon: const Icon(Icons.ios_share_rounded),
+            tooltip: 'Поделиться',
+            onPressed: _openShare,
+          )
+        : Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: TextButton.icon(
+              icon: const Icon(Icons.ios_share_rounded, size: 18),
+              label: const Text('Поделиться',
+                  style: TextStyle(fontFamily: 'HSESans')),
+              onPressed: _openShare,
+            ),
+          );
+
+    final previewBtn = IconButton(
+      icon: const Icon(Icons.visibility_outlined),
+      tooltip: 'Предпросмотр',
+      onPressed: () => context.go('/s/${s.slug}'),
+    );
+    final analyticsBtn = IconButton(
+      icon: const Icon(Icons.bar_chart_rounded),
+      tooltip: 'Аналитика',
+      onPressed: () => context.go('/analytics/${s.id}'),
+    );
+    final collaboratorsBtn = IconButton(
+      icon: const Icon(Icons.people_outline_rounded),
+      tooltip: 'Соавторы',
+      onPressed: () => showDialog(
+          context: context,
+          builder: (_) => CollaboratorsDialog(surveyId: s.id)),
+    );
+
+    // Кнопка публикации: на узких экранах — компактная иконка, иначе — полноценная.
+    final publishWidget = published
+        ? (compact
+            ? IconButton(
+                icon: const Icon(Icons.pause_rounded),
+                tooltip: 'В черновик',
+                onPressed: _publishToggle,
+              )
+            : OutlinedButton.icon(
+                icon: const Icon(Icons.pause_rounded, size: 18),
+                label: const Text('В черновик',
+                    style: TextStyle(fontFamily: 'HSESans')),
+                onPressed: _publishToggle,
+              ))
+        : (compact
+            ? IconButton(
+                icon: const Icon(Icons.rocket_launch_rounded),
+                tooltip: 'Опубликовать',
+                onPressed: _publishToggle,
+                color: HseColors.ink,
+              )
+            : GradientButton(
+                icon: Icons.rocket_launch_rounded,
+                onPressed: _publishToggle,
+                child: const Text('Опубликовать',
+                    style: TextStyle(fontFamily: 'HSESans')),
+              ));
+
+    final List<Widget> actions = compact
+        ? [
+            publishWidget,
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'Ещё',
+              onSelected: (v) {
+                switch (v) {
+                  case 'share':
+                    _openShare();
+                    break;
+                  case 'preview':
+                    context.go('/s/${s.slug}');
+                    break;
+                  case 'analytics':
+                    context.go('/analytics/${s.id}');
+                    break;
+                  case 'collab':
+                    showDialog(
+                        context: context,
+                        builder: (_) => CollaboratorsDialog(surveyId: s.id));
+                    break;
+                }
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'share',
+                  child: ListTile(
+                    leading: Icon(Icons.ios_share_rounded),
+                    title: Text('Поделиться',
+                        style: TextStyle(fontFamily: 'HSESans')),
+                    dense: true,
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'preview',
+                  child: ListTile(
+                    leading: Icon(Icons.visibility_outlined),
+                    title: Text('Предпросмотр',
+                        style: TextStyle(fontFamily: 'HSESans')),
+                    dense: true,
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'analytics',
+                  child: ListTile(
+                    leading: Icon(Icons.bar_chart_rounded),
+                    title: Text('Аналитика',
+                        style: TextStyle(fontFamily: 'HSESans')),
+                    dense: true,
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'collab',
+                  child: ListTile(
+                    leading: Icon(Icons.people_outline_rounded),
+                    title: Text('Соавторы',
+                        style: TextStyle(fontFamily: 'HSESans')),
+                    dense: true,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 4),
+          ]
+        : [
+            shareAction,
+            previewBtn,
+            analyticsBtn,
+            collaboratorsBtn,
+            const SizedBox(width: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: publishWidget,
+            ),
+          ];
 
     return Scaffold(
       backgroundColor: HseColors.surface,
       appBar: AppBar(
+        titleSpacing: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           tooltip: 'К списку',
@@ -286,9 +428,9 @@ class _BuilderScreenState extends State<BuilderScreen> {
         ),
         title: TextField(
           controller: _titleCtrl,
-          style: const TextStyle(
+          style: TextStyle(
               fontFamily: 'HSESans',
-              fontSize: 20,
+              fontSize: compact ? 17 : 20,
               fontWeight: FontWeight.w700,
               color: HseColors.ink),
           decoration: const InputDecoration(
@@ -305,58 +447,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
             _scheduleTitleSave();
           },
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: TextButton.icon(
-              icon: const Icon(Icons.ios_share_rounded, size: 18),
-              label: const Text('Поделиться',
-                  style: TextStyle(fontFamily: 'HSESans')),
-              onPressed: _openShare,
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.visibility_outlined),
-            tooltip: 'Предпросмотр',
-            onPressed: () => context.go('/s/${s.slug}'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.bar_chart_rounded),
-            tooltip: 'Аналитика',
-            onPressed: () => context.go('/analytics/${s.id}'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.people_outline_rounded),
-            tooltip: 'Соавторы',
-            onPressed: () => showDialog(
-                context: context,
-                builder: (_) => CollaboratorsDialog(surveyId: s.id)),
-          ),
-          IconButton(
-            icon: const Icon(Icons.smart_toy_outlined),
-            tooltip: 'AI-респонденты',
-            onPressed: s.questions.isEmpty ? null : () => showDialog(
-                context: context,
-                builder: (_) => SyntheticDialog(surveyId: s.id)),
-          ),
-          const SizedBox(width: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: published
-                ? OutlinedButton.icon(
-                    icon: const Icon(Icons.pause_rounded, size: 18),
-                    label: const Text('В черновик',
-                        style: TextStyle(fontFamily: 'HSESans')),
-                    onPressed: _publishToggle,
-                  )
-                : GradientButton(
-                    icon: Icons.rocket_launch_rounded,
-                    onPressed: _publishToggle,
-                    child: const Text('Опубликовать',
-                        style: TextStyle(fontFamily: 'HSESans')),
-                  ),
-          ),
-        ],
+        actions: actions,
       ),
       body: Row(children: [
         Expanded(

@@ -10,7 +10,7 @@ from .config import settings
 from .core.rate_limit import limiter
 from .database import engine
 from . import models  # noqa: F401  (register models with metadata)
-from .routers import auth, surveys, questions, responses, analytics, collaborators, uploads, synthetic
+from .routers import auth, surveys, questions, responses, analytics, collaborators, uploads
 
 
 async def _run_alembic_upgrade() -> None:
@@ -56,7 +56,6 @@ app.include_router(responses.router)
 app.include_router(analytics.router)
 app.include_router(collaborators.router)
 app.include_router(uploads.router)
-app.include_router(synthetic.router)
 
 
 @app.get("/health")
