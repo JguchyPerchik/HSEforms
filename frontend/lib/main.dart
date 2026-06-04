@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_web_plugins/url_strategy.dart'; 
 
 import 'theme.dart';
 import 'api/api_client.dart';
@@ -12,6 +13,7 @@ import 'screens/runner_screen.dart';
 import 'screens/analytics_screen.dart';
 
 void main() {
+  usePathUrlStrategy();
   runApp(const HseFormsApp());
 }
 
