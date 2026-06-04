@@ -8,26 +8,31 @@
 #   3. `docker compose up --build -d` — Caddy автоматически выпустит
 #      сертификат Let's Encrypt и обновит его перед истечением.
 #
-#  Этот файл смонтирован томом в docker-compose.yml, так что для смены
+#  Этот файл сgiмонтирован томом в docker-compose.yml, так что для смены
 #  домена достаточно поменять строчку ниже и сделать
 #  `docker compose restart frontend` — пересборка не нужна.
 # ──────────────────────────────────────────────────────────────────────────
 
 hseforms.ru {
-    # /api/* -> FastAPI (handle_path срезает префикс,
-    # поэтому /api/auth/login превращается в /auth/login для backend).
-    handle_path /api/* {
+    # Сжатие ответов для экономии трафика и ускорения загрузки
+    encode zstd gzip
+
+    # 1. Изолированный блок для API (FastAPI backend)
+    # Запросы /api/auth/login превратятся в /auth/login для контейнера backend
+    handle /api/* {
+        uri strip_prefix /api
         reverse_proxy backend:8000
     }
 
-    # Всё остальное — статика Flutter Web с SPA-fallback на index.html.
-    root * /usr/share/caddy
-    try_files {path} /index.html
-    file_server
+    # 2. Изолированный блок для фронтенда (Ловушка для всего остального кода)
+    # Статика Flutter Web с SPA-fallback на index.html.
+    handle {
+        root * /usr/share/caddy
+        try_files {path} /index.html
+        file_server
 
-    encode zstd gzip
-
-    # Длинный кеш для версионированных ассетов Flutter (main.dart.js и т.д.).
-    @assets path_regexp \.(js|css|woff2?|svg|png|jpg|jpeg|ico)$
-    header @assets Cache-Control "public, max-age=604800, immutable"
+        # Длинный кеш для версионированных ассетов Flutter (main.dart.js и т.д.).
+        @assets path_regexp \.(js|css|woff2?|svg|png|jpg|jpeg|ico)$
+        header @assets Cache-Control "public, max-age=604800, immutable"
+    }
 }
