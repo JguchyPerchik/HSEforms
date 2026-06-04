@@ -13,4 +13,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# В проде запускаем uvicorn без --reload — иначе процесс будет следить за
+# файловой системой и крашиться при любых тачах в /app. Для разработки
+# поднимайте локально или через `docker compose run --rm -v ./backend:/app
+# backend uvicorn app.main:app --reload --host 0.0.0.0`.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

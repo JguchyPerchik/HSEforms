@@ -33,7 +33,9 @@ class Response(Base):
     synthetic_profile: Mapped[dict] = mapped_column(JSONB, default=dict)
 
     answers: Mapped[list["Answer"]] = relationship(
-        back_populates="response", cascade="all, delete-orphan"
+        back_populates="response",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
 
