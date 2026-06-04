@@ -213,6 +213,20 @@ class _BuilderScreenState extends State<BuilderScreen> {
     await _load();
   }
 
+  Future<void> _resetAssignment() async {
+    if (survey == null) return;
+    try {
+      await _api.resetAssignment(survey!.id);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Не удалось сбросить счётчик: $e',
+              style: const TextStyle(fontFamily: 'HSESans')),
+        ));
+      }
+    }
+  }
+
   Future<void> _deleteVariant(int variantId) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -559,6 +573,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
               onOpenVariant: (vid) => context.go('/builder/$vid'),
               onChangeVariantWeight: _changeVariantWeight,
               onDeleteVariant: _deleteVariant,
+              onResetAssignment: _resetAssignment,
             ),
           ),
       ]),
@@ -597,6 +612,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
                     },
                     onChangeVariantWeight: _changeVariantWeight,
                     onDeleteVariant: _deleteVariant,
+                    onResetAssignment: _resetAssignment,
                   ),
                 ),
               ),

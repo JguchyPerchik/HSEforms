@@ -57,6 +57,12 @@ class Survey(Base):
     variant_weight: Mapped[float] = mapped_column(Float, default=1.0)
     variant_label: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
+    # Как раздавать варианты респондентам:
+    #   "random"      — взвешенный случайный выбор по variant_weight (дефолт)
+    #   "round_robin" — детерминированный круг через Redis INCR.
+    # Для дочерних опросов-вариантов поле не используется.
+    assignment_mode: Mapped[str] = mapped_column(String(20), default="random")
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

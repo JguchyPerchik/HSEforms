@@ -43,8 +43,9 @@ class _HseFormsAppState extends State<HseFormsApp> {
       router = GoRouter(
         refreshListenable: auth,
         redirect: (ctx, st) {
-          final isPublic = st.matchedLocation.startsWith('/s/');
-          final atLogin = st.matchedLocation == '/login';
+          final path = st.uri.path;
+          final isPublic = path.startsWith('/s/');
+          final atLogin = path == '/login';
           if (!auth.isAuthed && !isPublic && !atLogin) return '/login';
           if (auth.isAuthed && atLogin) return '/';
           return null;

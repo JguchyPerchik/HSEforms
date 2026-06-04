@@ -11,12 +11,15 @@ class SurveySettingsPanel extends StatelessWidget {
   final void Function(int variantId)? onOpenVariant;
   final Future<void> Function(int variantId, double weight)? onChangeVariantWeight;
   final Future<void> Function(int variantId)? onDeleteVariant;
+  /// Сбросить round-robin счётчик опроса (вернуть к началу очереди).
+  final Future<void> Function()? onResetAssignment;
 
   const SurveySettingsPanel({
     super.key, required this.survey,
     required this.onAddQuestion, required this.onSettingsChanged,
     this.onCreateVariant, this.onOpenVariant,
     this.onChangeVariantWeight, this.onDeleteVariant,
+    this.onResetAssignment,
   });
 
   @override
@@ -73,12 +76,20 @@ class SurveySettingsPanel extends StatelessWidget {
             ]),
             const SizedBox(height: 6),
             const Text(
-              'Создайте 2+ вариантов опроса. Респонденту будет показан один из вариантов '
-              'с вероятностью, пропорциональной установленному весу.',
+              'Создайте 2+ вариантов опроса. Респондентам можно раздавать '
+              'их случайно (по весам) или строго по очереди — выберите ниже.',
               style: TextStyle(color: HseColors.inkSoft, fontSize: 13, height: 1.4),
             ),
           ]),
         ),
+        if (survey.parentSurveyId == null && survey.variants.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _AssignmentModeSelector(
+            mode: survey.assignmentMode,
+            onChanged: (m) => onSettingsChanged({'assignment_mode': m}),
+            onReset: onResetAssignment,
+          ),
+        ],
         const SizedBox(height: 12),
         if (survey.parentSurveyId != null) Container(
           padding: const EdgeInsets.all(12),
@@ -236,6 +247,162 @@ class _QuestionTypeChip extends StatelessWidget {
             Icon(_icon, size: 16, color: HseColors.primary),
             const SizedBox(width: 6),
             Text(type.human, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _AssignmentModeSelector extends StatelessWidget {
+  final String mode;
+  final Future<void> Function(String) onChanged;
+  final Future<void> Function()? onReset;
+  const _AssignmentModeSelector({
+    required this.mode,
+    required this.onChanged,
+    this.onReset,
+  });
+
+  Future<void> _confirmReset(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Сбросить распределение?',
+            style: TextStyle(fontFamily: 'HSESans')),
+        content: const Text(
+          'Счётчик «по очереди» обнулится — следующий респондент получит '
+          'первый вариант. Сами ответы и веса вариантов не изменятся.',
+          style: TextStyle(fontFamily: 'HSESans'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена', style: TextStyle(fontFamily: 'HSESans')),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: HseColors.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Сбросить'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && onReset != null) {
+      await onReset!();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Счётчик сброшен',
+              style: TextStyle(fontFamily: 'HSESans'))),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isRR = mode == 'round_robin';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(HseRadius.md),
+        border: Border.all(color: HseColors.border, width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Раздача вариантов',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+          const SizedBox(height: 8),
+          // SegmentedButton + ширина 340px у боковой панели = переполнение.
+          // Делаем компактные радио-чипы вертикально.
+          _ModeOption(
+            selected: mode == 'random',
+            icon: Icons.casino_outlined,
+            title: 'Случайно (по весам)',
+            subtitle: 'Каждый респондент получает вариант случайно. Веса '
+                'задают пропорцию на большой выборке.',
+            onTap: () => onChanged('random'),
+          ),
+          const SizedBox(height: 6),
+          _ModeOption(
+            selected: isRR,
+            icon: Icons.format_list_numbered_rounded,
+            title: 'По очереди',
+            subtitle: 'Респонденты по очереди получают варианты в '
+                'круг. Точное равное распределение на малой выборке.',
+            onTap: () => onChanged('round_robin'),
+          ),
+          if (isRR && onReset != null) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                icon: const Icon(Icons.restart_alt_rounded, size: 16),
+                label: const Text('Сбросить счётчик',
+                    style: TextStyle(fontFamily: 'HSESans')),
+                onPressed: () => _confirmReset(context),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ModeOption extends StatelessWidget {
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  const _ModeOption({
+    required this.selected,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? HseColors.primary.withOpacity(0.07) : Colors.white,
+      borderRadius: BorderRadius.circular(HseRadius.sm),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(HseRadius.sm),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(HseRadius.sm),
+            border: Border.all(
+              color: selected ? HseColors.primary : HseColors.border,
+              width: selected ? 1.5 : 1.0,
+            ),
+          ),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(icon, size: 18,
+                color: selected ? HseColors.primary : HseColors.muted),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: selected ? HseColors.primary : HseColors.ink,
+                    )),
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: const TextStyle(
+                      color: HseColors.muted,
+                      fontSize: 11.5,
+                      height: 1.35,
+                    )),
+              ]),
+            ),
           ]),
         ),
       ),

@@ -170,6 +170,9 @@ class Survey {
   int? parentSurveyId;
   String? variantLabel;
   double variantWeight;
+  /// "random" — взвешенный случайный выбор варианта (дефолт).
+  /// "round_robin" — детерминированный круг через атомарный Redis-счётчик.
+  String assignmentMode;
   List<Question> questions;
   List<SurveyVariant> variants;
 
@@ -180,6 +183,7 @@ class Survey {
     this.allowBackNavigation = true, this.showProgress = true,
     Map<String, dynamic>? theme, this.parentSurveyId,
     this.variantLabel, this.variantWeight = 1.0,
+    this.assignmentMode = 'random',
     List<Question>? questions, List<SurveyVariant>? variants,
   })  : theme = theme ?? {},
         questions = questions ?? [],
@@ -197,6 +201,7 @@ class Survey {
     parentSurveyId: j['parent_survey_id'],
     variantLabel: j['variant_label'],
     variantWeight: (j['variant_weight'] ?? 1.0).toDouble(),
+    assignmentMode: (j['assignment_mode'] ?? 'random').toString(),
     questions: ((j['questions'] ?? []) as List).map((e) => Question.fromJson(e)).toList(),
     variants: ((j['variants'] ?? []) as List).map((e) => SurveyVariant.fromJson(e)).toList(),
   );

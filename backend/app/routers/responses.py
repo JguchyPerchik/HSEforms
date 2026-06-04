@@ -22,6 +22,7 @@ from ..core.variant import pick_variant
 from ..core.conditional import evaluate
 from ..core.signing import sign_path
 from ..models.collaboration import CollabRole
+from ..redis_client import redis_client
 
 
 def _sign_question(q_dict: dict) -> dict:
@@ -81,7 +82,10 @@ async def get_public_survey(
         if not user or survey.owner_id != user.id:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Опрос недоступен")
 
-    chosen = await pick_variant(db, survey)
+    # Превью-эндпоинт: подглядываем "следующего" по очереди, но НЕ
+    # инкрементим счётчик — иначе один респондент, который открыл страницу
+    # и потом нажал «Начать», прожжёт два номера и сдвинет распределение.
+    chosen = await pick_variant(db, survey, redis=redis_client, increment=False)
     res = await db.execute(
         select(Survey)
         .options(selectinload(Survey.questions).selectinload(Question.options))
@@ -102,7 +106,9 @@ async def start_response(
     if not survey or survey.status != SurveyStatus.published:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Опрос недоступен")
 
-    chosen = await pick_variant(db, survey)
+    # Реальный старт прохождения — здесь и происходит атомарный INCR
+    # round-robin счётчика. До этой точки счётчик не двигается.
+    chosen = await pick_variant(db, survey, redis=redis_client, increment=True)
 
     if chosen.one_response_per_user and user:
         ex = await db.execute(

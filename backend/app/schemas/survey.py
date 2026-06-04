@@ -17,6 +17,7 @@ class SurveyCreate(BaseModel):
     parent_survey_id: int | None = None
     variant_weight: float = 1.0
     variant_label: str | None = None
+    assignment_mode: str = "random"
 
 
 class SurveyUpdate(BaseModel):
@@ -30,6 +31,7 @@ class SurveyUpdate(BaseModel):
     theme: dict[str, Any] | None = None
     variant_weight: float | None = None
     variant_label: str | None = None
+    assignment_mode: str | None = None
 
 
 class SurveySummary(BaseModel):
@@ -55,6 +57,7 @@ class SurveyDetail(SurveySummary):
     allow_back_navigation: bool
     show_progress: bool
     theme: dict[str, Any]
+    assignment_mode: str = "random"
     questions: list[QuestionOut] = Field(default_factory=list)
     variants: list["SurveyVariantOut"] = Field(default_factory=list)
 

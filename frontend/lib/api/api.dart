@@ -51,6 +51,11 @@ class SurveysApi {
 
   Future<Survey> duplicate(int id) async => Survey.fromJson(await c.post('/surveys/$id/duplicate'));
 
+  /// Сбросить round-robin счётчик опроса. После сброса следующий респондент
+  /// снова получит первый вариант по очереди. На веса вариантов и режим
+  /// `assignment_mode` не влияет.
+  Future<void> resetAssignment(int id) async => c.post('/surveys/$id/reset_assignment');
+
   Future<Question> addQuestion(int surveyId, Map<String, dynamic> data) async =>
       Question.fromJson(await c.post('/surveys/$surveyId/questions', data));
 

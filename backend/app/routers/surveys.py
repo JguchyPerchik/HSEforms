@@ -23,6 +23,8 @@ from ..schemas.survey import (
 )
 from ..schemas.question import QuestionOut
 from ..core.deps import get_current_user
+from ..core.variant import rr_counter_key
+from ..redis_client import redis_client
 from ..core.permissions import get_survey_or_404, require_role
 
 
@@ -45,6 +47,7 @@ def _to_detail(s: Survey, variants: list[Survey]) -> SurveyDetail:
         parent_survey_id=s.parent_survey_id,
         variant_label=s.variant_label,
         variant_weight=s.variant_weight,
+        assignment_mode=s.assignment_mode or "random",
         created_at=s.created_at,
         updated_at=s.updated_at,
         questions=[QuestionOut.model_validate(q) for q in s.questions],
@@ -208,3 +211,24 @@ async def duplicate_survey(
             db.add(QuestionOption(question_id=nq.id, label=opt.label, value=opt.value, position=opt.position))
     await db.commit()
     return await get_survey(copy.id, user, db)
+
+
+@router.post("/{survey_id}/reset_assignment", status_code=204)
+async def reset_assignment(
+    survey_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Сбросить round-robin счётчик опроса.
+
+    После сброса следующий респондент снова получит первый вариант.
+    Используется, когда автор закрывает первую волну сбора и хочет
+    начать новую с равного распределения.
+
+    На переменные `assignment_mode` или `variant_weight` не влияет.
+    """
+    survey = await get_survey_or_404(db, survey_id)
+    await require_role(db, survey, user, CollabRole.editor)
+    # Сбрасываем счётчик у родителя — у вариантов своих счётчиков нет.
+    target_id = survey.parent_survey_id or survey.id
+    await redis_client.delete(rr_counter_key(target_id))
