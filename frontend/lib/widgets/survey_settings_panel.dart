@@ -151,7 +151,7 @@ class SurveySettingsPanel extends StatelessWidget {
             borderRadius: BorderRadius.circular(HseRadius.md),
           ),
           child: SelectableText(
-            '/#/s/${survey.slug}',
+            '/s/${survey.slug}',
             style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
           ),
         ),

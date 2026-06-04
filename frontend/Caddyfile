@@ -2,7 +2,7 @@
 #  Caddy reverse-proxy + статика Flutter Web для HSE Forms.
 #
 #  ВАЖНО перед первым запуском:
-#   1. Заменить `forms.example.com` ниже на твой реальный домен
+#   1. Заменить `hseforms.ru` ниже на твой реальный домен
 #      (тот, чья A-запись в DNS направлена на IP этого сервера).
 #   2. Открыть порты 80 и 443 в фаерволе хоста / облачной консоли.
 #   3. `docker compose up --build -d` — Caddy автоматически выпустит
@@ -14,16 +14,24 @@
 # ──────────────────────────────────────────────────────────────────────────
 
 hseforms.ru {
-    # /api/* -> FastAPI (handle_path срезает префикс,
-    # поэтому /api/auth/login превращается в /auth/login для backend).
+    # /api/* -> FastAPI. handle_path срезает префикс, поэтому
+    # /api/auth/login превращается в /auth/login для backend.
     handle_path /api/* {
         reverse_proxy backend:8000
     }
 
     # Всё остальное — статика Flutter Web с SPA-fallback на index.html.
-    root * /usr/share/caddy
-    try_files {path} /index.html
-    file_server
+    #
+    # КРИТИЧНО: эти три директивы ОБЯЗАНЫ быть внутри handle {} —
+    # иначе `try_files` выполняется в верхнем скоупе РАНЬШЕ, чем
+    # handle_path, и переписывает /api/auth/login в /index.html ещё
+    # до того, как запрос успеет попасть в reverse_proxy. В итоге
+    # POST уходит в file_server, и тот отвечает 405 Method Not Allowed.
+    handle {
+        root * /usr/share/caddy
+        try_files {path} /index.html
+        file_server
+    }
 
     encode zstd gzip
 

@@ -11,7 +11,12 @@ class ShareDialog extends StatelessWidget {
 
   String get _link {
     final origin = web.window.location.origin;
-    return '$origin/#/s/${survey.slug}';
+    // Path-based URL — go_router у нас работает без hash-режима. Если оставить
+    // `/#/s/...`, у респондента в браузере fragment отбросится при первом
+    // запросе, на сервер уйдёт `/`, фронт уведёт его на /login и опрос не
+    // откроется. Перед раздачей убедитесь, что в Caddy/nginx настроен
+    // SPA-fallback `try_files {path} /index.html` — иначе на F5 будет 404.
+    return '$origin/s/${survey.slug}';
   }
 
   String get _title => survey.title.isEmpty ? 'Опрос HSE Forms' : survey.title;
