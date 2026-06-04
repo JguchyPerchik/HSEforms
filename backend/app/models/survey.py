@@ -17,6 +17,7 @@ class SurveyStatus(str, enum.Enum):
 
 def _gen_slug() -> str:
     return secrets.token_urlsafe(8)
+    
 
 
 class Survey(Base):

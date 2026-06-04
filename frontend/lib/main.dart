@@ -41,6 +41,7 @@ class _HseFormsAppState extends State<HseFormsApp> {
     if (!mounted) return;
     setState(() {
       router = GoRouter(
+        initialLocation: Uri.base.path,
         refreshListenable: auth,
         redirect: (ctx, st) {
           final path = st.uri.path;
