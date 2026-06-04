@@ -63,12 +63,27 @@ class Survey(Base):
     )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # passive_deletes=True во всех трёх отношениях критично для async-SQLAlchemy:
+    # без этого флага `db.delete(survey)` пытается лениво подгрузить
+    # коллекции, чтобы каскадно пометить детей на удаление. В async-режиме
+    # ленивый load запрещён → транзакция падает молча → DELETE не уходит.
+    # Все FK на эти таблицы уже имеют `ondelete="CASCADE"`, поэтому
+    # Postgres сам удалит зависимые строки.
     questions: Mapped[list["Question"]] = relationship(
-        back_populates="survey", cascade="all, delete-orphan", order_by="Question.position"
+        back_populates="survey",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="Question.position",
     )
     variants: Mapped[list["Survey"]] = relationship(
-        "Survey", backref="parent", remote_side="Survey.id", cascade="all"
+        "Survey",
+        backref="parent",
+        remote_side="Survey.id",
+        cascade="all",
+        passive_deletes=True,
     )
     collaborators: Mapped[list["SurveyCollaborator"]] = relationship(
-        back_populates="survey", cascade="all, delete-orphan"
+        back_populates="survey",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )

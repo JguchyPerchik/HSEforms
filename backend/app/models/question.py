@@ -45,7 +45,10 @@ class Question(Base):
 
     survey: Mapped["Survey"] = relationship(back_populates="questions")
     options: Mapped[list["QuestionOption"]] = relationship(
-        back_populates="question", cascade="all, delete-orphan", order_by="QuestionOption.position"
+        back_populates="question",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="QuestionOption.position",
     )
 
 

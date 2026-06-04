@@ -144,8 +144,20 @@ async def delete_survey(
     survey = await get_survey_or_404(db, survey_id)
     if survey.owner_id != user.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Только владелец может удалить опрос")
-    await db.delete(survey)
-    await db.commit()
+    # passive_deletes=True на relationships означает, что SQLAlchemy не
+    # будет лениво подгружать questions/variants/collaborators перед
+    # удалением — каскад выполнит Postgres сам по ON DELETE CASCADE.
+    # Без этого флага async-движок падает на MissingGreenlet и DELETE
+    # тихо откатывается.
+    try:
+        await db.delete(survey)
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Не удалось удалить опрос: {e}",
+        )
 
 
 @router.post("/{survey_id}/duplicate", response_model=SurveyDetail)
