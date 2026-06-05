@@ -1,4 +1,4 @@
-// lib/main.dart
+// frontend/lib/main.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -29,6 +29,7 @@ class _HseFormsAppState extends State<HseFormsApp> {
   late final ApiClient client = ApiClient();
   late final AuthState auth = AuthState(client);
 
+  // 1. Делаем роутер non-nullable и инициализируем его мгновенно
   late final GoRouter router;
   bool _bootstrapped = false;
 
@@ -41,15 +42,14 @@ class _HseFormsAppState extends State<HseFormsApp> {
       redirect: (ctx, st) {
         final path = st.uri.path;
         final isPublic = path.startsWith('/s/');
-        
-        // ПРАВИЛО 1: Если это ссылка на опрос — пускаем всегда и без задержек!
+
+        // Если пользователь идет на публичный опрос — пускаем ВСЕГДА и без задержек
         if (isPublic) return null;
 
-        // Если это закрытая страница и проверка авторизации еще идет — ждем
+        // Если проверка токена админа еще идет, а страница приватная — ждем bootstrap
         if (!_bootstrapped) return null;
 
         final atLogin = path == '/login';
-
         if (!auth.isAuthed && !atLogin) return '/login';
         if (auth.isAuthed && atLogin) return '/';
         return null;
@@ -59,13 +59,11 @@ class _HseFormsAppState extends State<HseFormsApp> {
         GoRoute(path: '/', builder: (_, __) => const SurveysListScreen()),
         GoRoute(
           path: '/builder/:id',
-          builder: (_, s) =>
-              BuilderScreen(surveyId: int.parse(s.pathParameters['id']!)),
+          builder: (_, s) => BuilderScreen(surveyId: int.parse(s.pathParameters['id']!)),
         ),
         GoRoute(
           path: '/analytics/:id',
-          builder: (_, s) =>
-              AnalyticsScreen(surveyId: int.parse(s.pathParameters['id']!)),
+          builder: (_, s) => AnalyticsScreen(surveyId: int.parse(s.pathParameters['id']!)),
         ),
         GoRoute(
           path: '/s/:slug',
@@ -97,13 +95,15 @@ class _HseFormsAppState extends State<HseFormsApp> {
         debugShowCheckedModeBanner: false,
         theme: buildHseTheme(),
         routerConfig: router,
-
-        // Умный билдер: лоадер показывается ТОЛЬКО для приватных страниц.
-        // Публичные опросы рендерятся мгновенно, не ломая историю переходов браузера.
+        
+        // 2. Вместо подмены MaterialApp используем билдер. 
+        // Он показывает лоадер поверх страниц, сохраняя целостность роутера.
         builder: (context, child) {
           final currentPath = router.routerDelegate.currentConfiguration.uri.path;
           final isPublic = currentPath.startsWith('/s/');
 
+          // Показываем крутилку, только если мы еще не загрузились И страница ПРИВАТНАЯ.
+          // Публичные опросы рендерятся мгновенно.
           if (!_bootstrapped && !isPublic) {
             return const Scaffold(
               body: Center(child: CircularProgressIndicator()),

@@ -53,8 +53,9 @@ class _AppLoaderState extends State<_AppLoader> {
 
   @override
   Widget build(BuildContext context) {
-    final store = context.watch<SurveyStore>();
-    final tgTheme = store.tgTheme;
+    // 1. ИСПОЛЬЗУЕМ SELECT! Слушаем только смену темы.
+    // Теперь при изменении store.loaded сам MaterialApp НЕ будет перерисовываться!
+    final tgTheme = context.select<SurveyStore, TelegramThemeParams>((s) => s.tgTheme);
     final themeData = _buildTheme(tgTheme);
 
     return MaterialApp(
@@ -64,38 +65,42 @@ class _AppLoaderState extends State<_AppLoader> {
       darkTheme: _buildTheme(TelegramThemeParams.dark),
       themeMode: tgTheme.isDark ? ThemeMode.dark : ThemeMode.light,
       
-      // Динамическая маршрутизация, которая умеет ждать загрузку данных
+      // 2. Навигатор спокойно съедает URL /s/... и строит нужный экран
       onGenerateRoute: (settings) {
         final path = settings.name;
         
+        if (path != null && path.startsWith('/s/')) {
+          final slug = path.replaceFirst('/s/', '');
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => Scaffold(
+              body: Center(
+                child: Text(
+                  'БИНГО! Опрос: $slug', 
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          );
+        }
+        
         return MaterialPageRoute(
           settings: settings,
-          builder: (context) {
-            // Слушаем состояние загрузки прямо внутри страницы, не ломая MaterialApp
-            final currentStore = context.watch<SurveyStore>();
-            
-            // 1. Если база данных еще грузится — показываем крутилку, сохраняя путь в памяти
-            if (!currentStore.loaded) {
-              return const _SplashScreen();
-            }
-            
-            // 2. База загрузилась! Теперь проверяем, куда шел пользователь
-            if (path != null && path.startsWith('/s/')) {
-              final slug = path.replaceFirst('/s/', '');
-              return Scaffold(
-                body: Center(
-                  child: Text(
-                    'БИНГО! Опрос: $slug', 
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              );
-            }
-            
-            // 3. Если это не ссылка на опрос — отдаем обычный главный экран
-            return const HomeScreen();
-          },
+          builder: (_) => const HomeScreen(),
         );
+      },
+
+      // 3. МАГИЯ ЗДЕСЬ: перехватываем отрисовку всего, что под навигатором.
+      // Navigator уже зафиксировал URL в браузере, мы просто вешаем шторку-лоадер.
+      builder: (context, child) {
+        final isLoaded = context.select<SurveyStore, bool>((s) => s.loaded);
+        
+        if (!isLoaded) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return child!;
       },
     );
   }
@@ -106,12 +111,4 @@ class _AppLoaderState extends State<_AppLoader> {
       textTheme: GoogleFonts.plusJakartaSansTextTheme(base.textTheme),
     );
   }
-}
-
-class _SplashScreen extends StatelessWidget {
-  const _SplashScreen();
-  @override
-  Widget build(BuildContext context) => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
 }
