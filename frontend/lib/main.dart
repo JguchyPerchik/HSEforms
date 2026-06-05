@@ -26,67 +26,64 @@ class HseFormsApp extends StatefulWidget {
 class _HseFormsAppState extends State<HseFormsApp> {
   late final ApiClient client = ApiClient();
   late final AuthState auth = AuthState(client);
-  GoRouter? router;
+  
+  // Делаем роутер late final и инициализируем его сразу
+  late final GoRouter router;
+  bool _bootstrapped = false;
 
   @override
   void initState() {
     super.initState();
+    
+    // 1. Инициализируем роутер МГНОВЕННО, чтобы Flutter Web зафиксировал URL в браузере
+    router = GoRouter(
+      initialLocation: '/',
+      refreshListenable: auth,
+      redirect: (ctx, st) {
+        // Если проверка авторизации еще не завершилась — никуда не редиректим, ждем
+        if (!_bootstrapped) return null;
+
+        final path = st.uri.path;
+        final isPublic = path.startsWith('/s/');
+        final atLogin = path == '/login';
+        
+        if (!auth.isAuthed && !isPublic && !atLogin) return '/login';
+        if (auth.isAuthed && atLogin) return '/';
+        return null;
+      },
+      routes: [
+        GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+        GoRoute(path: '/', builder: (_, __) => const SurveysListScreen()),
+        GoRoute(
+          path: '/builder/:id',
+          builder: (_, s) => BuilderScreen(surveyId: int.parse(s.pathParameters['id']!)),
+        ),
+        GoRoute(
+          path: '/analytics/:id',
+          builder: (_, s) => AnalyticsScreen(surveyId: int.parse(s.pathParameters['id']!)),
+        ),
+        GoRoute(
+          path: '/s/:slug',
+          builder: (_, s) => RunnerScreen(slug: s.pathParameters['slug']!),
+        ),
+      ],
+    );
+
+    // 2. Запускаем асинхронную загрузку токена
     _bootstrap();
   }
 
   Future<void> _bootstrap() async {
-    // Resolve auth BEFORE building the router. Otherwise on hard refresh the
-    // protected screen would mount, fire its first API request, and race the
-    // token load — yielding a spurious 401. Waiting here is a few hundred
-    // milliseconds of "Loading…" instead.
     await auth.bootstrap();
     if (!mounted) return;
     setState(() {
-      router = GoRouter(
-        initialLocation: Uri.base.path,
-        refreshListenable: auth,
-        redirect: (ctx, st) {
-          final path = st.uri.path;
-          final isPublic = path.startsWith('/s/');
-          final atLogin = path == '/login';
-          if (!auth.isAuthed && !isPublic && !atLogin) return '/login';
-          if (auth.isAuthed && atLogin) return '/';
-          return null;
-        },
-        routes: [
-          GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-          GoRoute(path: '/', builder: (_, __) => const SurveysListScreen()),
-          GoRoute(
-            path: '/builder/:id',
-            builder: (_, s) => BuilderScreen(surveyId: int.parse(s.pathParameters['id']!)),
-          ),
-          GoRoute(
-            path: '/analytics/:id',
-            builder: (_, s) => AnalyticsScreen(surveyId: int.parse(s.pathParameters['id']!)),
-          ),
-          GoRoute(
-            path: '/s/:slug',
-            builder: (_, s) => RunnerScreen(slug: s.pathParameters['slug']!),
-          ),
-        ],
-      );
+      _bootstrapped = true;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final r = router;
-    if (r == null) {
-      // Splash while bootstrap is resolving the auth token. Themed minimally
-      // so it doesn't depend on providers that aren't installed yet.
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: buildHseTheme(),
-        home: const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        ),
-      );
-    }
+    // Всегда возвращаем MaterialApp.router, чтобы не ломать веб-ссылки
     return MultiProvider(
       providers: [
         Provider<ApiClient>.value(value: client),
@@ -96,7 +93,19 @@ class _HseFormsAppState extends State<HseFormsApp> {
         title: 'HSE Forms',
         debugShowCheckedModeBanner: false,
         theme: buildHseTheme(),
-        routerConfig: r,
+        routerConfig: router,
+        
+        // Магия перехвата: пока идет bootstrap, этот билдер показывает лоадер.
+        // При этом целевой экран (например, RunnerScreen) НЕ монтируется раньше времени,
+        // что полностью предотвращает гонку запросов и ошибку 401.
+        builder: (context, child) {
+          if (!_bootstrapped) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return child!;
+        },
       ),
     );
   }
