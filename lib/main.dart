@@ -1,8 +1,7 @@
-// lib/main.dart
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_web_plugins/url_strategy.dart'; 
 
 import 'providers/creator_provider.dart';
 import 'providers/filler_provider.dart';
@@ -13,6 +12,11 @@ import 'utils/telegram_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // <-- 2. Включаем стратегию путей ДО запуска всего остального.
+  // Это запретит Flutter Web обрезать ссылки и добавлять /#/
+  usePathUrlStrategy(); 
+
   await TelegramService.instance.initialize();
 
   runApp(
