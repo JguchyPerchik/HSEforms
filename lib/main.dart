@@ -1,7 +1,9 @@
+// lib/main.dart
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_web_plugins/url_strategy.dart'; 
+import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'providers/creator_provider.dart';
 import 'providers/filler_provider.dart';
@@ -13,10 +15,9 @@ import 'utils/telegram_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // <-- 2. Включаем стратегию путей ДО запуска всего остального.
-  // Это запретит Flutter Web обрезать ссылки и добавлять /#/
-  usePathUrlStrategy(); 
-
+  // Убираем /#/ из ссылок в браузере
+  usePathUrlStrategy();
+  
   await TelegramService.instance.initialize();
 
   runApp(
@@ -67,27 +68,32 @@ class _AppLoaderState extends State<_AppLoader> {
       theme: themeData,
       darkTheme: _buildTheme(TelegramThemeParams.dark),
       themeMode: tgTheme.isDark ? ThemeMode.dark : ThemeMode.light,
+      
+      // 1. Говорим Flutter, что по умолчанию мы стартуем с корня
+      initialRoute: '/',
+      
+      // 2. ПОЛНОСТЬЮ берем маршрутизацию под свой контроль
       onGenerateRoute: (settings) {
-        final path = settings.name; // здесь будет лежать твой '/s/123'
+        final path = settings.name;
         
-        // Если кто-то зашел по ссылке, начинающейся с /s/
+        // СЦЕНАРИЙ А: Кто-то пришел по ссылке на опрос
         if (path != null && path.startsWith('/s/')) {
-          final slug = path.replaceFirst('/s/', ''); // достаем '123'
+          final slug = path.replaceFirst('/s/', '');
           
           return MaterialPageRoute(
-            builder: (context) {
-              // ВРЕМЕННАЯ ЗАГЛУШКА: Выводим номер на экран, чтобы доказать, что ссылки работают
-              return Scaffold(
-                body: Center(
-                  child: Text('Ура! Ссылка работает. Опрос: $slug', style: const TextStyle(fontSize: 24)),
-                ),
-              );
-            },
+            builder: (context) => Scaffold(
+              body: Center(
+                child: Text('Ура! Ссылка работает. Опрос: $slug', style: const TextStyle(fontSize: 24)),
+              ),
+            ),
           );
         }
-        return null; 
+        
+        // СЦЕНАРИЙ Б: Обычный запуск сайта (открываем домашний экран)
+        return MaterialPageRoute(
+          builder: (context) => store.loaded ? const HomeScreen() : const _SplashScreen(),
+        );
       },
-      home: store.loaded ? const HomeScreen() : const _SplashScreen(),
     );
   }
 
