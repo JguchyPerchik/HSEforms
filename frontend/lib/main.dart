@@ -59,11 +59,28 @@ class _HseFormsAppState extends State<HseFormsApp> {
         GoRoute(path: '/', builder: (_, __) => const SurveysListScreen()),
         GoRoute(
           path: '/builder/:id',
-          builder: (_, s) => BuilderScreen(surveyId: int.parse(s.pathParameters['id']!)),
+          // ValueKey по id критичен для переключения между вариантами опроса.
+          // Без ключа Flutter видит, что GoRouter возвращает BuilderScreen
+          // того же типа, и переиспользует существующий Element — initState
+          // не вызывается, _load() не дёргается, состояние остаётся от
+          // прошлого варианта (старый survey, старый _parent, старый
+          // currentSurveyId). Симптомы: подсветка «открыт» висит на прежней
+          // строке, удалённые варианты не исчезают из списка, поля заголовка/
+          // описания не перезаполняются. С ValueKey каждый id — новый виджет,
+          // state дисается и пересоздаётся.
+          builder: (_, s) {
+            final id = int.parse(s.pathParameters['id']!);
+            return BuilderScreen(key: ValueKey('builder-$id'), surveyId: id);
+          },
         ),
         GoRoute(
           path: '/analytics/:id',
-          builder: (_, s) => AnalyticsScreen(surveyId: int.parse(s.pathParameters['id']!)),
+          // Та же история: экран аналитики тоже имеет :id-параметр и тоже
+          // не перезагружается при переходе между опросами без ключа.
+          builder: (_, s) {
+            final id = int.parse(s.pathParameters['id']!);
+            return AnalyticsScreen(key: ValueKey('analytics-$id'), surveyId: id);
+          },
         ),
         GoRoute(
           path: '/s/:slug',
