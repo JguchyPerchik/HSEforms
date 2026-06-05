@@ -75,7 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        _isRegister ? 'Создаём аккаунт' : 'С возвращением 123!',
+                        _isRegister ? 'Создаём аккаунт' : 'С возвращением!',
                         style: Theme.of(context).textTheme.displayMedium,
                       ),
                       const SizedBox(height: 6),
