@@ -37,7 +37,6 @@ class _HseFormsAppState extends State<HseFormsApp> {
 
     // 1. Инициализируем роутер МГНОВЕННО, чтобы Flutter Web зафиксировал URL в браузере
     router = GoRouter(
-      initialLocation: Uri.base.path,
       refreshListenable: auth,
       redirect: (ctx, st) {
         // Если проверка авторизации еще не завершилась — никуда не редиректим, ждем
