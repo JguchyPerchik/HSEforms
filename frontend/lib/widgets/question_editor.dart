@@ -681,6 +681,98 @@ class _OptionsEditorState extends State<OptionsEditor> {
     widget.onChanged();
   }
 
+  /// Перетаскивание варианта мышью. ReorderableListView корректирует
+  /// newIndex стандартным правилом (если двигаем вниз, надо вычесть 1).
+  /// После reorder синхронизируем три структуры:
+  ///   1. _rows — порядок UI-row'ов (контроллеры/фокусы)
+  ///   2. widget.options — данные модели
+  ///   3. .position у каждой option — чтобы сохранилось на бэке
+  void _reorder(int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex -= 1;
+    setState(() {
+      final row = _rows.removeAt(oldIndex);
+      _rows.insert(newIndex, row);
+      final opt = widget.options.removeAt(oldIndex);
+      widget.options.insert(newIndex, opt);
+      for (int k = 0; k < widget.options.length; k++) {
+        widget.options[k].position = k;
+      }
+    });
+    widget.onChanged();
+  }
+
+  Widget _buildRow(int i) {
+    return Padding(
+      // ObjectKey по экземпляру _OptionRow: уникален, переживает reorder,
+      // позволяет Flutter правильно сопоставлять состояние TextField'а
+      // с правильной строкой при перестановке.
+      key: ObjectKey(_rows[i]),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(children: [
+        // Drag handle. Без ReorderableDragStartListener жест начинается
+        // только после long-press по любой части — это плохо UX (легко
+        // случайно перетащить, мешает выделять текст в поле). С явной
+        // ручкой жест ограничен только этой иконкой.
+        ReorderableDragStartListener(
+          index: i,
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Icon(Icons.drag_indicator_rounded,
+                size: 18, color: HseColors.muted),
+          ),
+        ),
+        Icon(_bullet(), color: HseColors.muted, size: 18),
+        const SizedBox(width: 10),
+        Expanded(
+          child: TextField(
+            controller: _rows[i].controller,
+            focusNode: _rows[i].focus,
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'Вариант ${i + 1}',
+              filled: true,
+              fillColor: HseColors.surface,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(HseRadius.sm),
+                  borderSide: BorderSide.none),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(HseRadius.sm),
+                  borderSide: BorderSide.none),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(HseRadius.sm),
+                borderSide: const BorderSide(
+                    color: HseColors.primaryBright, width: 1.5),
+              ),
+            ),
+            // Авторастущее поле: длинные варианты ответа (типичные для
+            // вопросов про мотивы / описания) видно целиком.
+            minLines: 1,
+            maxLines: null,
+            keyboardType: TextInputType.multiline,
+            textCapitalization: TextCapitalization.sentences,
+            onChanged: (v) {
+              _rows[i].option.label = v;
+              _rows[i].option.value = v;
+              widget.onChanged();
+            },
+            onSubmitted: (_) {
+              widget.onChanged();
+              _addOption();
+            },
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.close_rounded, size: 18),
+          color: HseColors.muted,
+          tooltip: 'Удалить вариант',
+          onPressed: _rows.length > 1 ? () => _removeAt(i) : null,
+        ),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -693,54 +785,19 @@ class _OptionsEditorState extends State<OptionsEditor> {
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.0)),
       ),
-      for (int i = 0; i < _rows.length; i++)
-        Padding(
-          key: ValueKey(_rows[i]),
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(children: [
-            Icon(_bullet(), color: HseColors.muted, size: 18),
-            const SizedBox(width: 10),
-            Expanded(
-                child: TextField(
-              controller: _rows[i].controller,
-              focusNode: _rows[i].focus,
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: 'Вариант ${i + 1}',
-                filled: true,
-                fillColor: HseColors.surface,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(HseRadius.sm),
-                    borderSide: BorderSide.none),
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(HseRadius.sm),
-                    borderSide: BorderSide.none),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(HseRadius.sm),
-                  borderSide: const BorderSide(
-                      color: HseColors.primaryBright, width: 1.5),
-                ),
-              ),
-              onChanged: (v) {
-                _rows[i].option.label = v;
-                _rows[i].option.value = v;
-                widget.onChanged();
-              },
-              onSubmitted: (_) {
-                widget.onChanged();
-                _addOption();
-              },
-            )),
-            IconButton(
-              icon: const Icon(Icons.close_rounded, size: 18),
-              color: HseColors.muted,
-              tooltip: 'Удалить вариант',
-              onPressed: _rows.length > 1 ? () => _removeAt(i) : null,
-            ),
-          ]),
-        ),
+      // ReorderableListView внутри другого Scrollable (ListView в
+      // builder_screen). Без shrinkWrap+NeverScrollableScrollPhysics
+      // получим бесконечную высоту и nested-scroll конфликт.
+      ReorderableListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        buildDefaultDragHandles: false, // используем свой ReorderableDragStartListener
+        itemCount: _rows.length,
+        onReorder: _reorder,
+        // Дефолтный proxyDecorator оборачивает в Material с тенью — на
+        // нашем светлом фоне это «всплывает» аккуратно, оставляем.
+        itemBuilder: (ctx, i) => _buildRow(i),
+      ),
       const SizedBox(height: 4),
       Align(
         alignment: Alignment.centerLeft,
@@ -1225,6 +1282,14 @@ class _SinglePageEditorState extends State<_SinglePageEditor> {
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           decoration: const InputDecoration(
               labelText: 'Текст вопроса', hintText: 'О чём спрашиваем?'),
+          // Многострочный ввод: minLines=1 чтобы стартовал компактным
+          // (как однострочный), maxLines=null — растёт под содержимое
+          // вместо горизонтальной прокрутки. Длинные формулировки и
+          // вопросы из 2-3 предложений теперь видно целиком.
+          minLines: 1,
+          maxLines: null,
+          keyboardType: TextInputType.multiline,
+          textCapitalization: TextCapitalization.sentences,
           onChanged: (val) {
             slot.title = val;
             widget.onChanged();
@@ -1235,6 +1300,12 @@ class _SinglePageEditorState extends State<_SinglePageEditor> {
           controller: _desc,
           decoration: const InputDecoration(
               labelText: 'Подсказка или пояснение', hintText: 'Опционально'),
+          // То же самое — описание часто бывает длинным, без autosize
+          // приходится скроллить однострочное поле горизонтально.
+          minLines: 1,
+          maxLines: null,
+          keyboardType: TextInputType.multiline,
+          textCapitalization: TextCapitalization.sentences,
           onChanged: (val) {
             slot.description = val.isEmpty ? null : val;
             widget.onChanged();

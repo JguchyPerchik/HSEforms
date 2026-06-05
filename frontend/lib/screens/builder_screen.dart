@@ -113,6 +113,12 @@ class _BuilderScreenState extends State<BuilderScreen> {
   Future<void> _doSaveQuestion(Question q) async {
     try {
       final updated = await _api.updateQuestion(widget.surveyId, q.id, {
+        // type ОБЯЗАН быть в payload: без него смена типа (например,
+        // single_choice → multiple_choice) применяется только локально и
+        // откатывается при следующей загрузке опроса. Бэкенд принимает
+        // QuestionType | None в QuestionUpdate — если поле не пришло,
+        // exclude_unset=True его проигнорирует.
+        'type': q.type.name,
         'title': q.title,
         'description': q.description,
         'page_break_before': q.pageBreakBefore,
@@ -171,10 +177,43 @@ class _BuilderScreenState extends State<BuilderScreen> {
             ]
           : [],
     });
+
+    // Куда вставлять. Если есть раскрытый вопрос — сразу после него
+    // (типичный сценарий: пользователь читает длинный опрос, кликнул на
+    // вопрос, хочет добавить следующий рядом — а не мотать в конец).
+    // Если ничего не раскрыто — в конец, как было.
+    int insertIdx;
+    if (_expandedQid != null) {
+      final exp =
+          survey!.questions.indexWhere((x) => x.id == _expandedQid);
+      insertIdx = exp == -1 ? survey!.questions.length : exp + 1;
+    } else {
+      insertIdx = survey!.questions.length;
+    }
+
     setState(() {
-      survey!.questions.add(q);
+      survey!.questions.insert(insertIdx, q);
       _expandedQid = q.id;
     });
+
+    // Если вставили не в самый конец — нужно синхронизировать порядок
+    // на сервере. Бэк уже добавил вопрос с position = last+1, но
+    // относительно списка он окажется не там, где мы его показываем.
+    // Reorder перенумерует position-ы строго по нашему порядку.
+    //
+    // ВАЖНО: ответ reorder'а игнорируем — НЕ заменяем локальные объекты
+    // на серверные. Иначе если параллельно идёт debounced-сохранение
+    // другого вопроса, мы перезапишем уже набранный текст серверной
+    // (ещё не дошедшей) версией. Локально позиции в списке уже верные,
+    // поле position у Question.toJson всё равно не передаётся в update.
+    if (insertIdx < survey!.questions.length - 1) {
+      final ids = survey!.questions.map((x) => x.id).toList();
+      try {
+        await _api.reorder(widget.surveyId, ids);
+      } catch (_) {
+        // Не критично: render по индексу списка, не по полю position.
+      }
+    }
   }
 
   Future<void> _onReorder(int oldIndex, int newIndex) async {

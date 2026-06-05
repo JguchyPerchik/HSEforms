@@ -311,6 +311,18 @@ class _RunnerScreenState extends State<RunnerScreen> {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Баннер «опрос не опубликован» для владельца.
+                    // Технический фон: для не-владельца бэк отдаёт 404 на
+                    // /public/surveys/{slug} — он сюда вообще не попадёт.
+                    // Сюда без публикации добирается только владелец (см.
+                    // get_public_survey в responses.py) — ему и показываем
+                    // явное предупреждение, что ссылка наружу мёртвая.
+                    // Раньше тут была мелкая плашка «Режим предпросмотра»
+                    // в самом низу — её путали с «всё ок, форма работает».
+                    if (s.status != SurveyStatus.published) ...[
+                      _DraftBanner(status: s.status),
+                      const SizedBox(height: 16),
+                    ],
                     Container(
                       padding: const EdgeInsets.all(28),
                       decoration: BoxDecoration(
@@ -441,6 +453,57 @@ class _RunnerScreenState extends State<RunnerScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Большая предупреждающая плашка для владельца, открывшего собственный
+/// неопубликованный опрос по публичной ссылке. Сообщает, что респонденты
+/// эту ссылку увидят как 404 — чтобы владелец не отправил её внешним
+/// людям, думая «всё ок, форма же открывается».
+class _DraftBanner extends StatelessWidget {
+  final SurveyStatus status;
+  const _DraftBanner({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDraft = status == SurveyStatus.draft;
+    final label = isDraft ? 'Опрос в черновике' : 'Опрос закрыт';
+    final hint = isDraft
+        ? 'Это превью только для вас. По публичной ссылке респонденты '
+            'получат 404. Чтобы начать собирать ответы — нажмите '
+            '«Опубликовать» в редакторе.'
+        : 'Опрос завершён владельцем. Респонденты по публичной ссылке '
+            'получат 404, отправка новых ответов заблокирована.';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: const Color(0x1AE05656),
+        borderRadius: BorderRadius.circular(HseRadius.md),
+        border: Border.all(color: HseColors.danger.withOpacity(0.35), width: 1.2),
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Icon(Icons.lock_outline_rounded,
+            color: HseColors.danger, size: 22),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label,
+                style: const TextStyle(
+                    fontFamily: 'HSESans',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: HseColors.danger)),
+            const SizedBox(height: 4),
+            Text(hint,
+                style: const TextStyle(
+                    fontFamily: 'HSESans',
+                    fontSize: 12.5,
+                    color: HseColors.inkSoft,
+                    height: 1.4)),
+          ]),
+        ),
+      ]),
     );
   }
 }

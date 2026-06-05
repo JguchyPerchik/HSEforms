@@ -24,12 +24,22 @@ class ConditionEditor extends StatefulWidget {
 class _ConditionEditorState extends State<ConditionEditor> {
   late List<Map<String, dynamic>> clauses;
   late bool enabled;
+  /// 'all' = И (все условия), 'any' = ИЛИ (хотя бы одно).
+  /// Эта строка идёт прямо в JSON-ключ payload'а: бэкенд
+  /// (backend/app/core/conditional.py) и рантайм-валидатор на клиенте
+  /// (utils/conditional.dart) оба понимают и `all`, и `any` — фронт
+  /// просто выбирает обёртку.
+  late String _groupOp;
 
   @override
   void initState() {
     super.initState();
     final cond = widget.question.displayCondition;
     enabled = cond != null;
+    // Восстанавливаем оператор группировки из существующего условия:
+    // если в JSON ключ `any` — значит OR, иначе AND (старые сохранённые
+    // правила и пустые условия → AND по умолчанию).
+    _groupOp = (cond != null && cond['any'] is List) ? 'any' : 'all';
     clauses = enabled
         ? List<Map<String, dynamic>>.from(
             (cond!['all'] ?? cond['any'] ?? []) as List)
@@ -41,7 +51,7 @@ class _ConditionEditorState extends State<ConditionEditor> {
       widget.onChanged(null);
       return;
     }
-    widget.onChanged({'all': clauses});
+    widget.onChanged({_groupOp: clauses});
   }
 
   @override
@@ -73,6 +83,28 @@ class _ConditionEditorState extends State<ConditionEditor> {
         ]),
         if (enabled) ...[
           const SizedBox(height: 8),
+          // Переключатель И/ИЛИ. Показывается всегда при включённой
+          // логике (даже на 1 условии) для визуальной консистентности —
+          // пользователь сразу видит, в каком режиме окажется второе
+          // условие, когда он его добавит. На 2+ условиях смысл очевиден.
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(children: [
+              const Text('Совпадают: ',
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      color: HseColors.inkSoft,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(width: 6),
+              _GroupOpToggle(
+                value: _groupOp,
+                onChanged: (v) {
+                  setState(() => _groupOp = v);
+                  _emit();
+                },
+              ),
+            ]),
+          ),
           for (int i = 0; i < clauses.length; i++) _clauseRow(i),
           TextButton.icon(
             icon: const Icon(Icons.add, size: 18),
@@ -182,6 +214,56 @@ class _ConditionEditorState extends State<ConditionEditor> {
           },
         ),
       ]),
+    );
+  }
+}
+
+/// Сегментный переключатель «И / ИЛИ» для группировки условий.
+/// Маленький, помещается в одну строку с подписью.
+class _GroupOpToggle extends StatelessWidget {
+  final String value; // 'all' или 'any'
+  final ValueChanged<String> onChanged;
+  const _GroupOpToggle({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: HseColors.border),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        _segment(label: 'И', tooltip: 'Все условия должны выполняться', op: 'all'),
+        Container(width: 1, height: 24, color: HseColors.border),
+        _segment(label: 'ИЛИ', tooltip: 'Хотя бы одно условие выполняется', op: 'any'),
+      ]),
+    );
+  }
+
+  Widget _segment({required String label, required String tooltip, required String op}) {
+    final selected = value == op;
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: () => onChanged(op),
+        borderRadius: BorderRadius.circular(7),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: selected ? HseColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Text(label,
+              style: TextStyle(
+                fontFamily: 'HSESans',
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.4,
+                color: selected ? Colors.white : HseColors.inkSoft,
+              )),
+        ),
+      ),
     );
   }
 }

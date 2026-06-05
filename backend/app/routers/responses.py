@@ -149,6 +149,21 @@ async def submit_response(
     if resp.is_complete:
         raise HTTPException(status.HTTP_409_CONFLICT, "Уже отправлено")
 
+    # Если владелец перевёл опрос в draft/closed уже после того, как
+    # респондент нажал «Начать», старая submit-сессия раньше всё равно
+    # завершалась и ответы записывались. Это противоречит контракту
+    # «черновик = ссылка не активна»: ответы продолжали капать после
+    # отзыва публикации. Теперь блокируем submit на любом не-published
+    # статусе — статус смотрим у того конкретного Survey (chosen variant),
+    # к которому привязан resp. Возврат 410 Gone (а не 404) — потому что
+    # ресурс существовал и был валиден; сейчас семантически «ушёл».
+    parent_survey = await db.get(Survey, resp.survey_id)
+    if not parent_survey or parent_survey.status != SurveyStatus.published:
+        raise HTTPException(
+            status.HTTP_410_GONE,
+            "Опрос больше не активен — отправка невозможна",
+        )
+
     res = await db.execute(
         select(Question).options(selectinload(Question.options)).where(Question.survey_id == resp.survey_id)
     )
