@@ -1,3 +1,5 @@
+// lib/main.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -27,7 +29,6 @@ class _HseFormsAppState extends State<HseFormsApp> {
   late final ApiClient client = ApiClient();
   late final AuthState auth = AuthState(client);
 
-  // Делаем роутер late final и инициализируем его сразу
   late final GoRouter router;
   bool _bootstrapped = false;
 
@@ -35,18 +36,21 @@ class _HseFormsAppState extends State<HseFormsApp> {
   void initState() {
     super.initState();
 
-    // 1. Инициализируем роутер МГНОВЕННО, чтобы Flutter Web зафиксировал URL в браузере
     router = GoRouter(
       refreshListenable: auth,
       redirect: (ctx, st) {
-        // Если проверка авторизации еще не завершилась — никуда не редиректим, ждем
-        if (!_bootstrapped) return null;
-
         final path = st.uri.path;
         final isPublic = path.startsWith('/s/');
+        
+        // ПРАВИЛО 1: Если это ссылка на опрос — пускаем всегда и без задержек!
+        if (isPublic) return null;
+
+        // Если это закрытая страница и проверка авторизации еще идет — ждем
+        if (!_bootstrapped) return null;
+
         final atLogin = path == '/login';
 
-        if (!auth.isAuthed && !isPublic && !atLogin) return '/login';
+        if (!auth.isAuthed && !atLogin) return '/login';
         if (auth.isAuthed && atLogin) return '/';
         return null;
       },
@@ -70,7 +74,6 @@ class _HseFormsAppState extends State<HseFormsApp> {
       ],
     );
 
-    // 2. Запускаем асинхронную загрузку токена
     _bootstrap();
   }
 
@@ -84,7 +87,6 @@ class _HseFormsAppState extends State<HseFormsApp> {
 
   @override
   Widget build(BuildContext context) {
-    // Всегда возвращаем MaterialApp.router, чтобы не ломать веб-ссылки
     return MultiProvider(
       providers: [
         Provider<ApiClient>.value(value: client),
@@ -96,11 +98,13 @@ class _HseFormsAppState extends State<HseFormsApp> {
         theme: buildHseTheme(),
         routerConfig: router,
 
-        // Магия перехвата: пока идет bootstrap, этот билдер показывает лоадер.
-        // При этом целевой экран (например, RunnerScreen) НЕ монтируется раньше времени,
-        // что полностью предотвращает гонку запросов и ошибку 401.
+        // Умный билдер: лоадер показывается ТОЛЬКО для приватных страниц.
+        // Публичные опросы рендерятся мгновенно, не ломая историю переходов браузера.
         builder: (context, child) {
-          if (!_bootstrapped) {
+          final currentPath = router.routerDelegate.currentConfiguration.uri.path;
+          final isPublic = currentPath.startsWith('/s/');
+
+          if (!_bootstrapped && !isPublic) {
             return const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             );
