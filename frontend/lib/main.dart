@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_web_plugins/url_strategy.dart'; 
+import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'theme.dart';
 import 'api/api_client.dart';
@@ -26,7 +26,7 @@ class HseFormsApp extends StatefulWidget {
 class _HseFormsAppState extends State<HseFormsApp> {
   late final ApiClient client = ApiClient();
   late final AuthState auth = AuthState(client);
-  
+
   // Делаем роутер late final и инициализируем его сразу
   late final GoRouter router;
   bool _bootstrapped = false;
@@ -34,10 +34,10 @@ class _HseFormsAppState extends State<HseFormsApp> {
   @override
   void initState() {
     super.initState();
-    
+
     // 1. Инициализируем роутер МГНОВЕННО, чтобы Flutter Web зафиксировал URL в браузере
     router = GoRouter(
-      initialLocation: '/',
+      initialLocation: Uri.base.path,
       refreshListenable: auth,
       redirect: (ctx, st) {
         // Если проверка авторизации еще не завершилась — никуда не редиректим, ждем
@@ -46,7 +46,7 @@ class _HseFormsAppState extends State<HseFormsApp> {
         final path = st.uri.path;
         final isPublic = path.startsWith('/s/');
         final atLogin = path == '/login';
-        
+
         if (!auth.isAuthed && !isPublic && !atLogin) return '/login';
         if (auth.isAuthed && atLogin) return '/';
         return null;
@@ -56,11 +56,13 @@ class _HseFormsAppState extends State<HseFormsApp> {
         GoRoute(path: '/', builder: (_, __) => const SurveysListScreen()),
         GoRoute(
           path: '/builder/:id',
-          builder: (_, s) => BuilderScreen(surveyId: int.parse(s.pathParameters['id']!)),
+          builder: (_, s) =>
+              BuilderScreen(surveyId: int.parse(s.pathParameters['id']!)),
         ),
         GoRoute(
           path: '/analytics/:id',
-          builder: (_, s) => AnalyticsScreen(surveyId: int.parse(s.pathParameters['id']!)),
+          builder: (_, s) =>
+              AnalyticsScreen(surveyId: int.parse(s.pathParameters['id']!)),
         ),
         GoRoute(
           path: '/s/:slug',
@@ -94,7 +96,7 @@ class _HseFormsAppState extends State<HseFormsApp> {
         debugShowCheckedModeBanner: false,
         theme: buildHseTheme(),
         routerConfig: router,
-        
+
         // Магия перехвата: пока идет bootstrap, этот билдер показывает лоадер.
         // При этом целевой экран (например, RunnerScreen) НЕ монтируется раньше времени,
         // что полностью предотвращает гонку запросов и ошибку 401.
