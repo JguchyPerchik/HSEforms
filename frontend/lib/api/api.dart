@@ -85,6 +85,125 @@ class SurveysApi {
       c.delete('/surveys/$surveyId/collaborators/$userId');
 }
 
+/// Описание одного формата экспорта — для UI и для запроса.
+/// Держим в одном месте, чтобы добавить новый формат было ровно
+/// одним изменением (добавить запись в [ExportsApi.formats]).
+class ExportFormat {
+  final String id;          // ключ для UI и аналитики
+  final String label;       // подпись в боттом-шите
+  final String description; // одна строка-объяснение под подписью
+  final String path;        // относительный путь к endpoint'у (без surveyId)
+  final String mimeType;
+  final String fallbackExt; // расширение для fallback-имени файла
+
+  /// Поддерживает ли формат фильтры `include_incomplete` / `include_synthetic`.
+  /// Codebook и analytics — нет (они не про сырые ответы).
+  final bool supportsFilters;
+
+  /// Доп. параметры запроса — например, layout=wide для CSV.
+  final Map<String, String> extraQuery;
+
+  const ExportFormat({
+    required this.id,
+    required this.label,
+    required this.description,
+    required this.path,
+    required this.mimeType,
+    required this.fallbackExt,
+    this.supportsFilters = true,
+    this.extraQuery = const {},
+  });
+}
+
+class ExportsApi {
+  final ApiClient c;
+  ExportsApi(this.c);
+
+  /// Каноничный список форматов. Порядок = порядок в UI.
+  static const List<ExportFormat> formats = [
+    ExportFormat(
+      id: 'csv_wide',
+      label: 'CSV (wide)',
+      description: 'Одна строка = один респондент. Открывается в Excel, R, SPSS, Python.',
+      path: '/responses.csv',
+      mimeType: 'text/csv',
+      fallbackExt: 'csv',
+      extraQuery: {'layout': 'wide'},
+    ),
+    ExportFormat(
+      id: 'csv_long',
+      label: 'CSV (long, tidy)',
+      description: 'Одна строка = один ответ. Для tidyverse, pandas.melt, ggplot.',
+      path: '/responses.csv',
+      mimeType: 'text/csv',
+      fallbackExt: 'csv',
+      extraQuery: {'layout': 'long'},
+    ),
+    ExportFormat(
+      id: 'xlsx',
+      label: 'Excel (.xlsx)',
+      description: 'Книга из 5 листов: Сводка, Wide, Long, Вопросы, Кодбук, Агрегации.',
+      path: '/responses.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      fallbackExt: 'xlsx',
+    ),
+    ExportFormat(
+      id: 'sav',
+      label: 'SPSS (.sav)',
+      description: 'С метками переменных и значений — для SPSS/PSPP/Stata-импорта.',
+      path: '/responses.sav',
+      mimeType: 'application/x-spss-sav',
+      fallbackExt: 'sav',
+    ),
+    ExportFormat(
+      id: 'json_raw',
+      label: 'JSON (полный дамп)',
+      description: 'Без потерь: вложенные multi-choice, варианты, метаданные. Для архива и API.',
+      path: '/responses.json',
+      mimeType: 'application/json',
+      fallbackExt: 'json',
+    ),
+    ExportFormat(
+      id: 'json_aggregated',
+      label: 'JSON (агрегации)',
+      description: 'Готовые распределения по вопросам и вариантам — то же, что и на этом экране.',
+      path: '/analytics.json',
+      mimeType: 'application/json',
+      fallbackExt: 'json',
+      supportsFilters: false,
+    ),
+    ExportFormat(
+      id: 'codebook',
+      label: 'Codebook (CSV)',
+      description: 'Словарь переменных: имя в датасете → исходный вопрос → возможные значения.',
+      path: '/codebook.csv',
+      mimeType: 'text/csv',
+      fallbackExt: 'csv',
+      supportsFilters: false,
+    ),
+  ];
+
+  Future<void> download(
+    int surveyId,
+    ExportFormat f, {
+    bool includeIncomplete = true,
+    bool includeSynthetic = true,
+  }) async {
+    final params = <String, String>{...f.extraQuery};
+    if (f.supportsFilters) {
+      params['include_incomplete'] = includeIncomplete.toString();
+      params['include_synthetic'] = includeSynthetic.toString();
+    }
+    final qs = params.entries.map((e) => '${e.key}=${e.value}').join('&');
+    final path = '/surveys/$surveyId/export${f.path}${qs.isEmpty ? '' : '?$qs'}';
+    await c.downloadAuthed(
+      path,
+      fallbackFilename: 'survey_${surveyId}_${f.id}.${f.fallbackExt}',
+      mimeType: f.mimeType,
+    );
+  }
+}
+
 class PublicApi {
   final ApiClient c;
   PublicApi(this.c);

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:js_interop';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -121,5 +122,68 @@ class ApiClient {
   Future<dynamic> delete(String path) async {
     await _ready.future;
     return _handle(await http.delete(Uri.parse('$baseUrl$path'), headers: _headers()));
+  }
+
+  /// Скачать файл по защищённому endpoint'у — для экспортов.
+  ///
+  /// Простой `window.open(url)` тут не работает: браузер не подцепит
+  /// `Authorization: Bearer ...` к новой вкладке. Вариантов два — либо
+  /// генерировать на бэке временные подписанные URL (как для медиа), либо
+  /// тянуть тело XHR-ом с правильными хедерами и собирать Blob на лету.
+  /// Второй путь проще: один метод закрывает все форматы, не нужна
+  /// отдельная инфраструктура подписи. Минус — весь файл проходит через
+  /// память вкладки; для типичных опросов (десятки тысяч ответов) это ок.
+  ///
+  /// Имя файла берётся из `Content-Disposition` ответа, чтобы бэк
+  /// контролировал расширение (`.csv` / `.xlsx` / `.sav` / `.json`).
+  /// Если заголовка нет — используется [fallbackFilename].
+  Future<void> downloadAuthed(
+    String path, {
+    required String fallbackFilename,
+    required String mimeType,
+  }) async {
+    await _ready.future;
+    if (!kIsWeb) {
+      throw UnsupportedError('Скачивание поддержано только в веб-версии');
+    }
+    final resp = await http.get(Uri.parse('$baseUrl$path'), headers: _headers());
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      // Тело может быть JSON-ошибкой от FastAPI ({"detail": "..."}) — попробуем
+      // распарсить, чтобы показать осмысленное сообщение в UI.
+      String msg = 'Не удалось скачать файл';
+      try {
+        final body = jsonDecode(utf8.decode(resp.bodyBytes));
+        if (body is Map && body['detail'] != null) msg = body['detail'].toString();
+      } catch (_) {/* not JSON — оставляем дефолт */}
+      throw ApiException(resp.statusCode, msg);
+    }
+
+    final filename = _filenameFromContentDisposition(resp.headers) ?? fallbackFilename;
+
+    // Uint8List → JSUint8Array → JSArray<JSAny> для Blob-конструктора.
+    final part = resp.bodyBytes.toJS;
+    final blob = web.Blob(
+      <JSAny>[part].toJS,
+      web.BlobPropertyBag(type: mimeType),
+    );
+    final blobUrl = web.URL.createObjectURL(blob);
+    final a = web.document.createElement('a') as web.HTMLAnchorElement;
+    a.href = blobUrl;
+    a.download = filename;
+    // Anchor нужно вставить в DOM, иначе Firefox игнорирует click().
+    web.document.body!.appendChild(a);
+    a.click();
+    a.remove();
+    // Освобождаем blob URL — иначе в долгой сессии память не вернётся.
+    web.URL.revokeObjectURL(blobUrl);
+  }
+
+  /// Парсит `filename="..."` из Content-Disposition. Регистр заголовка
+  /// зависит от HTTP-клиента/прокси, проверяем оба.
+  String? _filenameFromContentDisposition(Map<String, String> headers) {
+    final cd = headers['content-disposition'] ?? headers['Content-Disposition'];
+    if (cd == null) return null;
+    final m = RegExp(r'filename="([^"]+)"').firstMatch(cd);
+    return m?.group(1);
   }
 }

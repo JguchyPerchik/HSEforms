@@ -10,7 +10,7 @@ from .config import settings
 from .core.rate_limit import limiter
 from .database import engine
 from . import models  # noqa: F401  (register models with metadata)
-from .routers import auth, surveys, questions, responses, analytics, collaborators, uploads
+from .routers import auth, surveys, questions, responses, analytics, collaborators, uploads, exports
 
 
 async def _run_alembic_upgrade() -> None:
@@ -54,6 +54,7 @@ app.include_router(surveys.router)
 app.include_router(questions.router)
 app.include_router(responses.router)
 app.include_router(analytics.router)
+app.include_router(exports.router)
 app.include_router(collaborators.router)
 app.include_router(uploads.router)
 
