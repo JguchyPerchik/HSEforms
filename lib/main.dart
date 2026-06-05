@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'providers/creator_provider.dart';
 import 'providers/filler_provider.dart';
@@ -14,10 +13,6 @@ import 'utils/telegram_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Убираем /#/ из ссылок в браузере
-  usePathUrlStrategy();
-  
   await TelegramService.instance.initialize();
 
   runApp(
@@ -69,45 +64,38 @@ class _AppLoaderState extends State<_AppLoader> {
       darkTheme: _buildTheme(TelegramThemeParams.dark),
       themeMode: tgTheme.isDark ? ThemeMode.dark : ThemeMode.light,
       
-      // 1. ПЕРЕХВАТЫВАЕМ ПЕРВЫЙ ЗАПУСК ИЗ БРАУЗЕРА
-      onGenerateInitialRoutes: (initialRoute) {
-        // Если при запуске в адресной строке есть ссылка на опрос
-        if (initialRoute.startsWith('/s/')) {
-          final slug = initialRoute.replaceFirst('/s/', '');
-          
-          return [
-            MaterialPageRoute(
-              builder: (context) => Scaffold(
-                body: Center(
-                  child: Text('БИНГО! Опрос: $slug', style: const TextStyle(fontSize: 24)),
-                ),
-              ),
-            )
-          ];
-        }
-        
-        // Обычный запуск (без ссылки на опрос) — грузим HomeScreen
-        return [
-          MaterialPageRoute(
-            builder: (context) => store.loaded ? const HomeScreen() : const _SplashScreen(),
-          )
-        ];
-      },
-
-      // 2. Обрабатываем переходы внутри приложения (когда оно уже работает)
+      // Динамическая маршрутизация, которая умеет ждать загрузку данных
       onGenerateRoute: (settings) {
         final path = settings.name;
-        if (path != null && path.startsWith('/s/')) {
-          final slug = path.replaceFirst('/s/', '');
-          return MaterialPageRoute(
-            builder: (context) => Scaffold(
-              body: Center(
-                child: Text('БИНГО! Опрос: $slug', style: const TextStyle(fontSize: 24)),
-              ),
-            ),
-          );
-        }
-        return null; 
+        
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (context) {
+            // Слушаем состояние загрузки прямо внутри страницы, не ломая MaterialApp
+            final currentStore = context.watch<SurveyStore>();
+            
+            // 1. Если база данных еще грузится — показываем крутилку, сохраняя путь в памяти
+            if (!currentStore.loaded) {
+              return const _SplashScreen();
+            }
+            
+            // 2. База загрузилась! Теперь проверяем, куда шел пользователь
+            if (path != null && path.startsWith('/s/')) {
+              final slug = path.replaceFirst('/s/', '');
+              return Scaffold(
+                body: Center(
+                  child: Text(
+                    'БИНГО! Опрос: $slug', 
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              );
+            }
+            
+            // 3. Если это не ссылка на опрос — отдаем обычный главный экран
+            return const HomeScreen();
+          },
+        );
       },
     );
   }
