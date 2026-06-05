@@ -22,11 +22,22 @@ class BuilderScreen extends StatefulWidget {
 class _BuilderScreenState extends State<BuilderScreen> {
   late final SurveysApi _api = SurveysApi(context.read<ApiClient>());
   Survey? survey;
+  /// Родительский опрос, если текущий — child-вариант. Нужен затем, чтобы
+  /// правая панель могла отрисовать ПОЛНЫЙ список вариантов (parent +
+  /// siblings) даже когда мы открыли один из вариантов, а не корень.
+  /// Без этого, находясь в child'е, нельзя было увидеть братьев и
+  /// перепрыгнуть на них одним кликом — приходилось возвращаться в parent.
+  Survey? _parent;
   bool _busy = false;
   int? _expandedQid;
   Timer? _titleSaveTimer;
   late TextEditingController _titleCtrl;
   late TextEditingController _descCtrl;
+
+  /// Корневой опрос — parent (если мы в child) или сам survey (если мы и
+  /// есть parent). От него считаются: список вариантов, target для
+  /// создания нового варианта, и URL «возврата» при удалении текущего.
+  Survey get _root => _parent ?? survey!;
 
   // Per-question debounced + serialized save infrastructure.
   final Map<int, Timer> _qSaveTimers = {};
@@ -58,6 +69,23 @@ class _BuilderScreenState extends State<BuilderScreen> {
       survey = s;
       _titleCtrl.text = s.title;
       _descCtrl.text = s.description ?? '';
+      // Если открыт child-вариант — параллельно подтягиваем родителя, чтобы
+      // в правой панели сразу был полный список братьев. Один лишний GET
+      // на каждом входе в child — приемлемая цена за то, чтобы не пилить
+      // backend (там сейчас Survey.variants для child пустой; альтернатива —
+      // менять `_to_detail`, чтобы для child он отдавал siblings, но это
+      // больше изменение API на меньший выигрыш).
+      if (s.parentSurveyId != null) {
+        try {
+          _parent = await _api.get(s.parentSurveyId!);
+        } catch (_) {
+          // Если parent недоступен (например, удалён) — просто не покажем
+          // список вариантов. Сам child всё равно открыт и редактируется.
+          _parent = null;
+        }
+      } else {
+        _parent = null;
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -190,21 +218,25 @@ class _BuilderScreenState extends State<BuilderScreen> {
   }
 
   Future<void> _createVariant() async {
-    final letter = String.fromCharCode(65 + survey!.variants.length + 1);
-    final v = await _api.create(
-      title: '${survey!.title} — Вариант $letter',
-      parentId: survey!.id,
+    // Считаем номер варианта от корня, а не от текущего опроса — иначе при
+    // создании варианта изнутри child'а буква бы сбилась (у child массив
+    // variants пустой, и каждый новый получал бы букву B).
+    final letter = String.fromCharCode(65 + _root.variants.length + 1);
+    await _api.create(
+      title: '${_root.title} — Вариант $letter',
+      // Все варианты висят на корне (root), а не на сиблингах. Это
+      // важно: если бы parentId был current id, мы бы получили дерево
+      // глубиной >1, а раздача вариантов в pick_variant работает только
+      // с плоским списком потомков корня.
+      parentId: _root.id,
       variantLabel: 'Вариант $letter',
       variantWeight: 1.0,
     );
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Создан «Вариант $letter». Открыть для редактирования?',
-            style: TextStyle(fontFamily: 'HSESans')),
-        action: SnackBarAction(
-            label: 'Открыть', onPressed: () => context.go('/builder/${v.id}')),
-      ));
-    }
+    // Просто обновляем — новый вариант появится строкой в правой панели,
+    // оттуда пользователь сам решит, переключаться на него или нет.
+    // Раньше тут был SnackBar «Открыть для редактирования?» — он отвлекал
+    // от текущей работы и дублировал функционал, который теперь живёт в
+    // правой панели (вся строка варианта — кликабельный таб).
     await _load();
   }
 
@@ -251,7 +283,16 @@ class _BuilderScreenState extends State<BuilderScreen> {
     );
     if (ok == true) {
       await _api.delete(variantId);
-      await _load();
+      if (!mounted) return;
+      // Если удалили вариант, на котором сейчас находимся, URL станет
+      // невалидным (на /builder/<deleted-id> бэк ответит 404). Прыгаем
+      // на корень — он всегда жив, потому что удалить его через эту кнопку
+      // нельзя (у root в правой панели нет иконки удаления).
+      if (variantId == survey!.id) {
+        context.go('/builder/${_root.id}');
+      } else {
+        await _load();
+      }
     }
   }
 
@@ -564,6 +605,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
             ),
             child: SurveySettingsPanel(
               survey: s,
+              parent: _parent,
+              currentSurveyId: s.id,
               onAddQuestion: _addQuestion,
               onSettingsChanged: (data) async {
                 final updated = await _api.update(s.id, data);
@@ -594,6 +637,8 @@ class _BuilderScreenState extends State<BuilderScreen> {
                   initialChildSize: 0.85,
                   builder: (_, scroll) => SurveySettingsPanel(
                     survey: s,
+                    parent: _parent,
+                    currentSurveyId: s.id,
                     onAddQuestion: (t) {
                       Navigator.pop(context);
                       _addQuestion(t);
@@ -603,7 +648,10 @@ class _BuilderScreenState extends State<BuilderScreen> {
                       setState(() => survey = updated);
                     },
                     onCreateVariant: () async {
-                      Navigator.pop(context);
+                      // Шит НЕ закрываем — в нём же лежит список вариантов,
+                      // где появится свежесозданный. На широком экране оба
+                      // меняются одинаково, на мобильном — пользователь
+                      // увидит новый таб сразу и решит, кликнуть или нет.
                       await _createVariant();
                     },
                     onOpenVariant: (vid) {

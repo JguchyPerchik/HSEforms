@@ -4,7 +4,21 @@ import '../models/models.dart';
 import '../theme.dart';
 
 class SurveySettingsPanel extends StatelessWidget {
+  /// Опрос, который пользователь сейчас редактирует. Может быть как
+  /// корневым (parent_survey_id == null), так и одним из вариантов.
   final Survey survey;
+
+  /// Корневой опрос — заполнен, только если [survey] сам является вариантом.
+  /// Используется, чтобы отрисовать полный список табов (root + все
+  /// варианты) внутри child-view; без этого список братьев был недоступен
+  /// и приходилось вручную возвращаться в parent.
+  final Survey? parent;
+
+  /// ID текущего открытого опроса. Нужен для подсветки активного таба и
+  /// для блокировки клика «открыть себя же». Можно было бы взять из
+  /// [survey].id, но явный параметр читается понятнее на месте вызова.
+  final int currentSurveyId;
+
   final void Function(QuestionType) onAddQuestion;
   final Future<void> Function(Map<String, dynamic>) onSettingsChanged;
   final Future<void> Function()? onCreateVariant;
@@ -16,11 +30,17 @@ class SurveySettingsPanel extends StatelessWidget {
 
   const SurveySettingsPanel({
     super.key, required this.survey,
+    required this.currentSurveyId,
+    this.parent,
     required this.onAddQuestion, required this.onSettingsChanged,
     this.onCreateVariant, this.onOpenVariant,
     this.onChangeVariantWeight, this.onDeleteVariant,
     this.onResetAssignment,
   });
+
+  /// Корневой опрос: либо отдельно переданный [parent], либо сам [survey],
+  /// если у него нет родителя. Список вариантов берётся отсюда.
+  Survey get _root => parent ?? survey;
 
   @override
   Widget build(BuildContext context) {
@@ -82,75 +102,85 @@ class SurveySettingsPanel extends StatelessWidget {
             ),
           ]),
         ),
-        if (survey.parentSurveyId == null && survey.variants.isNotEmpty) ...[
+        // Селектор «как раздавать» актуален только если у корня есть хотя
+        // бы один child-вариант. Берём состояние с КОРНЯ — `assignment_mode`
+        // живёт там, у вариантов это поле игнорируется.
+        if (_root.variants.isNotEmpty) ...[
           const SizedBox(height: 12),
           _AssignmentModeSelector(
-            mode: survey.assignmentMode,
+            mode: _root.assignmentMode,
+            // Изменение режима всегда уезжает на корень. Если мы сейчас в
+            // child'е — onSettingsChanged уйдёт на текущий survey id, что
+            // НЕправильно. На уровне родителя поле есть и работает; для
+            // child'а смена режима через эту панель просто не имеет смысла,
+            // поэтому ниже onChanged заворачиваем в дисэйбл для child-view.
             onChanged: (m) => onSettingsChanged({'assignment_mode': m}),
             onReset: onResetAssignment,
+            disabled: parent != null, // в child'е режим не редактируется
           ),
         ],
         const SizedBox(height: 12),
-        if (survey.parentSurveyId != null) Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0x1A234B9B),
-            borderRadius: BorderRadius.circular(HseRadius.md),
+
+        // ─── Список вариантов: всегда видимый, кликабельный, с подсветкой ───
+        //
+        // Раньше блок прятался под условием `parentSurveyId == null` и в
+        // child'е заменялся плашкой «управляйте через родительский». Новое
+        // поведение: список ВСЕГДА показан, текущий открытый вариант
+        // подсвечен рамкой+фоном и некликабельный, остальные кликаются как
+        // табы — клик дёргает onOpenVariant, который ведёт на /builder/<id>.
+        Row(children: [
+          Expanded(child: Text(
+            _root.variants.isEmpty
+                ? 'Вариантов пока нет'
+                : 'Варианты (${_root.variants.length + 1})', // +1 за основной
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          )),
+          if (onCreateVariant != null) TextButton.icon(
+            icon: const Icon(Icons.add_rounded, size: 16),
+            label: const Text('Добавить'),
+            onPressed: () => onCreateVariant!(),
           ),
-          child: Row(children: [
-            Icon(Icons.account_tree_rounded, color: HseColors.primaryBright, size: 18),
-            const SizedBox(width: 8),
-            const Expanded(child: Text(
-              'Этот опрос — вариант. Управляйте им через родительский.',
-              style: TextStyle(fontSize: 12.5, color: HseColors.primary, fontWeight: FontWeight.w600),
-            )),
-          ]),
-        ) else ...[
-          Row(children: [
-            Expanded(child: Text(
-              survey.variants.isEmpty ? 'Вариантов пока нет' : 'Варианты (${survey.variants.length})',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            )),
-            if (onCreateVariant != null) TextButton.icon(
-              icon: const Icon(Icons.add_rounded, size: 16),
-              label: const Text('Добавить'),
-              onPressed: () => onCreateVariant!(),
+        ]),
+        const SizedBox(height: 6),
+        if (_root.variants.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+            decoration: BoxDecoration(
+              color: HseColors.surface,
+              borderRadius: BorderRadius.circular(HseRadius.md),
+              border: Border.all(color: HseColors.border, width: 1),
             ),
-          ]),
-          const SizedBox(height: 6),
-          if (survey.variants.isEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-              decoration: BoxDecoration(
-                color: HseColors.surface,
-                borderRadius: BorderRadius.circular(HseRadius.md),
-                border: Border.all(color: HseColors.border, style: BorderStyle.solid, width: 1),
-              ),
-              child: const Text(
-                'Нажмите «Добавить», чтобы создать копию текущего опроса. ',
-                style: TextStyle(color: HseColors.muted, fontSize: 12.5, height: 1.4),
-              ),
-            )
-          else ...[
-            _VariantRow(
-              label: survey.variantLabel ?? 'Основной',
-              weight: survey.variantWeight,
-              isMain: true,
-              onOpen: null,
-              onChangeWeight: null,
-              onDelete: null,
+            child: const Text(
+              'Нажмите «Добавить», чтобы создать копию текущего опроса. ',
+              style: TextStyle(color: HseColors.muted, fontSize: 12.5, height: 1.4),
             ),
-            ...survey.variants.map((v) => _VariantRow(
-              label: v.variantLabel ?? v.title,
-              weight: v.variantWeight,
-              isMain: false,
-              onOpen: onOpenVariant != null ? () => onOpenVariant!(v.id) : null,
-              onChangeWeight: onChangeVariantWeight != null
-                  ? (w) => onChangeVariantWeight!(v.id, w)
-                  : null,
-              onDelete: onDeleteVariant != null ? () => onDeleteVariant!(v.id) : null,
-            )),
-          ],
+          )
+        else ...[
+          // Корневой опрос — всегда первой строкой как «Основной». Клик
+          // переключает на него (если мы сейчас в child'е), либо
+          // disabled (если мы и так на нём).
+          _VariantRow(
+            label: _root.variantLabel ?? 'Основной',
+            weight: _root.variantWeight,
+            isMain: true,
+            isCurrent: _root.id == currentSurveyId,
+            // На root удалить нельзя — через эту панель снести можно только
+            // child-варианты. Поэтому onDelete всегда null.
+            onSelect: _root.id == currentSurveyId
+                ? null
+                : (onOpenVariant != null ? () => onOpenVariant!(_root.id) : null),
+            onDelete: null,
+          ),
+          ..._root.variants.map((v) => _VariantRow(
+            label: v.variantLabel ?? v.title,
+            weight: v.variantWeight,
+            isMain: false,
+            isCurrent: v.id == currentSurveyId,
+            onSelect: v.id == currentSurveyId
+                ? null // мы уже здесь — не даём кликнуть на самого себя
+                : (onOpenVariant != null ? () => onOpenVariant!(v.id) : null),
+            onDelete: onDeleteVariant != null ? () => onDeleteVariant!(v.id) : null,
+          )),
         ],
         const SizedBox(height: 28),
         _SectionHeader(text: 'ССЫЛКА'),
@@ -258,10 +288,18 @@ class _AssignmentModeSelector extends StatelessWidget {
   final String mode;
   final Future<void> Function(String) onChanged;
   final Future<void> Function()? onReset;
+  /// true — селектор показан, но клики и кнопка сброса отключены.
+  /// Используется, когда панель открыта из child-варианта: режим раздачи
+  /// и счётчик живут на корне, менять их «через child» не имеет смысла —
+  /// бэк бы отверг (или хуже, тихо записал поле в child, где оно не
+  /// читается). Показываем «как есть», чтобы было видно текущий режим,
+  /// плюс подсказка, что менять надо из основного.
+  final bool disabled;
   const _AssignmentModeSelector({
     required this.mode,
     required this.onChanged,
     this.onReset,
+    this.disabled = false,
   });
 
   Future<void> _confirmReset(BuildContext context) async {
@@ -309,44 +347,61 @@ class _AssignmentModeSelector extends StatelessWidget {
         borderRadius: BorderRadius.circular(HseRadius.md),
         border: Border.all(color: HseColors.border, width: 1.2),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Раздача вариантов',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-          const SizedBox(height: 8),
-          // SegmentedButton + ширина 340px у боковой панели = переполнение.
-          // Делаем компактные радио-чипы вертикально.
-          _ModeOption(
-            selected: mode == 'random',
-            icon: Icons.casino_outlined,
-            title: 'Случайно (по весам)',
-            subtitle: 'Каждый респондент получает вариант случайно. Веса '
-                'задают пропорцию на большой выборке.',
-            onTap: () => onChanged('random'),
-          ),
-          const SizedBox(height: 6),
-          _ModeOption(
-            selected: isRR,
-            icon: Icons.format_list_numbered_rounded,
-            title: 'По очереди',
-            subtitle: 'Респонденты по очереди получают варианты в '
-                'круг. Точное равное распределение на малой выборке.',
-            onTap: () => onChanged('round_robin'),
-          ),
-          if (isRR && onReset != null) ...[
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                icon: const Icon(Icons.restart_alt_rounded, size: 16),
-                label: const Text('Сбросить счётчик',
-                    style: TextStyle(fontFamily: 'HSESans')),
-                onPressed: () => _confirmReset(context),
-              ),
+      child: Opacity(
+        // Визуально приглушаем весь блок в disabled-режиме, чтобы было
+        // ясно: смотреть можно, менять нельзя.
+        opacity: disabled ? 0.55 : 1.0,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Раздача вариантов',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            const SizedBox(height: 8),
+            // SegmentedButton + ширина 340px у боковой панели = переполнение.
+            // Делаем компактные радио-чипы вертикально.
+            _ModeOption(
+              selected: mode == 'random',
+              icon: Icons.casino_outlined,
+              title: 'Случайно (по весам)',
+              subtitle: 'Каждый респондент получает вариант случайно. Веса '
+                  'задают пропорцию на большой выборке.',
+              onTap: disabled ? null : () => onChanged('random'),
             ),
+            const SizedBox(height: 6),
+            _ModeOption(
+              selected: isRR,
+              icon: Icons.format_list_numbered_rounded,
+              title: 'По очереди',
+              subtitle: 'Респонденты по очереди получают варианты в '
+                  'круг. Точное равное распределение на малой выборке.',
+              onTap: disabled ? null : () => onChanged('round_robin'),
+            ),
+            if (isRR && onReset != null && !disabled) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.restart_alt_rounded, size: 16),
+                  label: const Text('Сбросить счётчик',
+                      style: TextStyle(fontFamily: 'HSESans')),
+                  onPressed: () => _confirmReset(context),
+                ),
+              ),
+            ],
+            if (disabled) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Открыто из варианта. Чтобы изменить режим — переключитесь '
+                'на «Основной» в списке выше.',
+                style: TextStyle(
+                  color: HseColors.muted,
+                  fontSize: 11.5,
+                  height: 1.35,
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -357,7 +412,10 @@ class _ModeOption extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-  final VoidCallback onTap;
+  /// null — опция показана, но не реагирует на тап (disabled-режим).
+  /// Используется, когда селектор открыт из child-варианта (см.
+  /// [_AssignmentModeSelector.disabled]).
+  final VoidCallback? onTap;
   const _ModeOption({
     required this.selected,
     required this.icon,
@@ -410,47 +468,121 @@ class _ModeOption extends StatelessWidget {
   }
 }
 
+/// Строка-таб варианта. Раньше переключение было через отдельную иконку
+/// «open_in_new» — пользователь её часто пропускал и не понимал, как
+/// переключиться. Теперь вся строка — большая кликабельная зона. Активный
+/// вариант не имеет onSelect (null) и визуально подсвечен «выбранным».
 class _VariantRow extends StatelessWidget {
   final String label;
   final double weight;
+  /// true — корневой опрос. Влияет на иконку и подпись «Основной».
   final bool isMain;
-  final VoidCallback? onOpen;
-  final ValueChanged<double>? onChangeWeight;
+  /// true — этот вариант сейчас открыт. На него нельзя кликнуть.
+  final bool isCurrent;
+  /// null — строка некликабельна (это активный вариант, или нет коллбэка).
+  final VoidCallback? onSelect;
   final VoidCallback? onDelete;
   const _VariantRow({
     required this.label, required this.weight, required this.isMain,
-    this.onOpen, this.onChangeWeight, this.onDelete,
+    required this.isCurrent,
+    this.onSelect, this.onDelete,
   });
   @override
   Widget build(BuildContext context) {
-    return Container(
+    // Подбор стилей под три состояния: активный / кликабельный / disabled.
+    final Color bg;
+    final Color borderColor;
+    final double borderWidth;
+    if (isCurrent) {
+      // Активный таб — наиболее яркий: primary-tint фон + жирная primary рамка.
+      bg = HseColors.primary.withOpacity(0.09);
+      borderColor = HseColors.primary;
+      borderWidth = 1.6;
+    } else if (isMain) {
+      // Корневой опрос (не текущий) — нейтральный, чтобы не путать с активным.
+      bg = HseColors.surfaceAlt;
+      borderColor = HseColors.border;
+      borderWidth = 1.2;
+    } else {
+      bg = Colors.white;
+      borderColor = HseColors.border;
+      borderWidth = 1.2;
+    }
+
+    final content = Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+      padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
       decoration: BoxDecoration(
-        color: isMain ? HseColors.surfaceAlt : Colors.white,
+        color: bg,
         borderRadius: BorderRadius.circular(HseRadius.md),
-        border: Border.all(color: HseColors.border, width: 1.2),
+        border: Border.all(color: borderColor, width: borderWidth),
       ),
       child: Row(children: [
-        Icon(isMain ? Icons.bookmark_rounded : Icons.science_outlined, size: 16, color: HseColors.primaryBright),
+        Icon(
+          isMain ? Icons.bookmark_rounded : Icons.science_outlined,
+          size: 16,
+          color: isCurrent ? HseColors.primary : HseColors.primaryBright,
+        ),
         const SizedBox(width: 8),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-            Text('Вес: ${weight.toStringAsFixed(1)}', style: const TextStyle(color: HseColors.muted, fontSize: 11)),
+            Row(children: [
+              Flexible(
+                child: Text(label,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: isCurrent ? HseColors.primary : HseColors.ink,
+                    ),
+                    overflow: TextOverflow.ellipsis),
+              ),
+              if (isCurrent) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: HseColors.primary,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'открыт',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                ),
+              ],
+            ]),
+            Text('Вес: ${weight.toStringAsFixed(1)}',
+                style: const TextStyle(color: HseColors.muted, fontSize: 11)),
           ]),
-        ),
-        if (onOpen != null) IconButton(
-          icon: const Icon(Icons.open_in_new_rounded, size: 16),
-          tooltip: 'Открыть вариант',
-          onPressed: onOpen,
         ),
         if (onDelete != null) IconButton(
           icon: const Icon(Icons.delete_outline_rounded, size: 16),
           tooltip: 'Удалить вариант',
           onPressed: onDelete,
+          // Иконка удаления внутри кликабельной строки — её собственный
+          // onTap «всплыл» бы и до родительского InkWell тоже, дёргая
+          // переключение. Закрываем splash и не даём событию подняться.
         ),
       ]),
+    );
+
+    // Если строка активна или нет колбэка — отдаём контейнер как есть,
+    // без InkWell (никакого ripple/cursor pointer). Иначе оборачиваем
+    // в Material+InkWell для нормального tap-feedback.
+    if (onSelect == null) return content;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(HseRadius.md),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(HseRadius.md),
+        onTap: onSelect,
+        child: content,
+      ),
     );
   }
 }
