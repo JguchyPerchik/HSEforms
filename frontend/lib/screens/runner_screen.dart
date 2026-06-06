@@ -263,8 +263,8 @@ class _RunnerScreenState extends State<RunnerScreen> {
   Widget build(BuildContext context) {
     if (_busy && survey == null) {
       return Scaffold(
-        appBar: _previewAppBar(),
-        body: const Center(child: CircularProgressIndicator()));
+          appBar: _previewAppBar(),
+          body: const Center(child: CircularProgressIndicator()));
     }
     if (_error != null) return Scaffold(body: Center(child: Text(_error!)));
     if (survey == null) {
@@ -326,8 +326,8 @@ class _RunnerScreenState extends State<RunnerScreen> {
                             width: double.infinity,
                             child: ElevatedButton.icon(
                               onPressed: () => context.go('/login'),
-                              icon: const Icon(
-                                  Icons.add_circle_outline_rounded, size: 18),
+                              icon: const Icon(Icons.add_circle_outline_rounded,
+                                  size: 18),
                               label: const Text('Создай свой первый опрос!'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _primary(s),
@@ -346,10 +346,10 @@ class _RunnerScreenState extends State<RunnerScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 18),
                           Text(
                             'Ты прошел опрос на новой платформе HSEForms, '
-                            'если хочешь потыкать, регистрируйся',
+                            'если хочешь потыкать — регистрируйся ;)',
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                                 fontFamily: 'HSESans',
@@ -566,14 +566,16 @@ class _DraftBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0x1AE05656),
         borderRadius: BorderRadius.circular(HseRadius.md),
-        border: Border.all(color: HseColors.danger.withOpacity(0.35), width: 1.2),
+        border:
+            Border.all(color: HseColors.danger.withOpacity(0.35), width: 1.2),
       ),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Icon(Icons.lock_outline_rounded,
             color: HseColors.danger, size: 22),
         const SizedBox(width: 12),
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label,
                 style: const TextStyle(
                     fontFamily: 'HSESans',
