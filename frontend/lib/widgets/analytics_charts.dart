@@ -72,12 +72,16 @@ extension on _CatChart {
 extension on _NumChart {
   String get label => switch (this) {
         _NumChart.histogram => 'Гистограмма',
-        _NumChart.line => 'Линия',
+        // Раньше «Линия» рисовала ту же гистограмму, только curve'нную —
+        // дублировала «Гистограмму». Теперь это полноценный временной
+        // тренд (среднее значение по бакетам времени), название поменяно
+        // соответственно.
+        _NumChart.line => 'Тренд',
         _NumChart.table => 'Таблица',
       };
   IconData get icon => switch (this) {
         _NumChart.histogram => Icons.bar_chart,
-        _NumChart.line => Icons.show_chart,
+        _NumChart.line => Icons.timeline_rounded,
         _NumChart.table => Icons.table_rows_outlined,
       };
 }
@@ -97,7 +101,16 @@ extension on _TxtChart {
 
 class QuestionAnalyticsCard extends StatefulWidget {
   final Map<String, dynamic> question; // raw item из /analytics
-  const QuestionAnalyticsCard({super.key, required this.question});
+  /// Шаг временного тренда («5min» | «hour» | «day» | «week»). Авто-выбран
+  /// на бэкенде по разбросу submitted_at — общий для всего опроса,
+  /// потому что иначе нельзя сравнивать тренды разных вопросов. Если
+  /// поле отсутствует (старый ответ API), упадём на 'day' по умолчанию.
+  final String trendBin;
+  const QuestionAnalyticsCard({
+    super.key,
+    required this.question,
+    this.trendBin = 'day',
+  });
 
   @override
   State<QuestionAnalyticsCard> createState() => _QuestionAnalyticsCardState();
@@ -247,7 +260,11 @@ class _QuestionAnalyticsCardState extends State<QuestionAnalyticsCard> {
         case _NumChart.histogram:
           return _NumericBars(hist: hist);
         case _NumChart.line:
-          return _NumericLine(hist: hist);
+          // Тренд берётся НЕ из distribution (там агрегат без времени),
+          // а из question.trend — список TrendPoint'ов, посчитанный на
+          // бэкенде по submitted_at.
+          final trend = (widget.question['trend'] as List?) ?? const [];
+          return _NumericLine(trend: trend, binName: widget.trendBin);
         case _NumChart.table:
           return _NumericTable(stats: _NumStats.from(dist), hist: hist);
       }
@@ -803,59 +820,210 @@ class _NumericBars extends StatelessWidget {
   }
 }
 
+/// Временной тренд средних значений ответа.
+///
+/// Получает массив `trend` из бэкенда (см. TrendPoint в schemas/analytics.py):
+/// каждая точка — {bucket: ISO datetime, mean: double, n: int}. Шаг бакета
+/// (5min/hour/day/week) определяется на бэке по разбросу submitted_at и
+/// передаётся в [binName] — нужен, чтобы выбрать формат подписи на оси X.
+///
+/// Логика подписей:
+///   • 5min/hour → «HH:MM» (или «DD.MM HH:MM» если бакеты охватывают
+///                  больше одного дня — это не должно случаться при таком
+///                  биннинге, но защита есть)
+///   • day        → «DD.MM»
+///   • week       → «DD.MM» начала недели (понедельник)
+///
+/// На вход timestamp прилетает в UTC (с суффиксом Z или +00:00). Парсим
+/// его как UTC и конвертим в local — пользователь хочет видеть «своё»
+/// время, а не серверное.
 class _NumericLine extends StatelessWidget {
-  final Map hist;
-  const _NumericLine({required this.hist});
+  final List trend;       // List<Map> от backend'а
+  final String binName;   // '5min' | 'hour' | 'day' | 'week'
+  const _NumericLine({required this.trend, required this.binName});
+
+  /// Парсит ISO-строку из backend'а как UTC, возвращает local DateTime.
+  /// Backend форматирует через .isoformat() с tz-info, так что Dart
+  /// сразу выдаёт правильный UTC. Конвертация в local — для отображения.
+  DateTime _parse(String iso) => DateTime.parse(iso).toLocal();
+
+  /// Подпись на оси X для конкретной даты в зависимости от шага бакета.
+  String _label(DateTime t) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    switch (binName) {
+      case '5min':
+      case 'hour':
+        return '${two(t.hour)}:${two(t.minute)}';
+      case 'week':
+      case 'day':
+      default:
+        return '${two(t.day)}.${two(t.month)}';
+    }
+  }
+
+  /// Подпись в тултипе — более развёрнутая, чтобы пользователь видел
+  /// полный контекст: дата + время для under-day бакетов, только дата
+  /// для дневных/недельных.
+  String _tooltipLabel(DateTime t) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    final date = '${two(t.day)}.${two(t.month)}.${t.year}';
+    if (binName == '5min' || binName == 'hour') {
+      return '$date ${two(t.hour)}:${two(t.minute)}';
+    }
+    if (binName == 'week') {
+      // Конец недели = начало + 6 дней
+      final end = t.add(const Duration(days: 6));
+      return '$date – ${two(end.day)}.${two(end.month)}';
+    }
+    return date;
+  }
+
+  String get _binHuman => switch (binName) {
+        '5min' => 'по 5 мин',
+        'hour' => 'по часу',
+        'week' => 'по неделям',
+        _ => 'по дням',
+      };
 
   @override
   Widget build(BuildContext context) {
-    final entries = hist.entries.toList()
-      ..sort((a, b) => int.parse(a.key.toString())
-          .compareTo(int.parse(b.key.toString())));
-    if (entries.isEmpty) return const SizedBox.shrink();
-    final spots = [
-      for (final e in entries)
-        FlSpot(double.parse(e.key.toString()), (e.value as num).toDouble()),
-    ];
-    final maxY =
-        spots.fold<double>(0, (m, s) => s.y > m ? s.y : m);
+    if (trend.isEmpty) {
+      return _emptyHint(
+          'Тренд считается по завершённым ответам с известным временем '
+          'отправки. Пока таких ответов нет.');
+    }
+    if (trend.length < 2) {
+      return _emptyHint(
+          'Для тренда нужно хотя бы 2 точки во времени. '
+          'Текущий шаг бакета — $_binHuman. '
+          'Когда соберётся больше ответов, график появится автоматически.');
+    }
 
-    return SizedBox(
-      height: 200,
-      child: LineChart(LineChartData(
-        minY: 0,
-        maxY: maxY * 1.1,
-        lineBarsData: [
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
-            curveSmoothness: 0.25,
-            color: HseColors.primary,
-            barWidth: 3,
-            dotData: const FlDotData(show: true),
-            belowBarData: BarAreaData(
-              show: true,
-              color: HseColors.primary.withOpacity(0.12),
+    // Преобразуем trend в спарсенные точки. X — порядковый индекс
+    // бакета (0..N-1): так fl_chart рисует ровные интервалы по оси,
+    // а пробелы во времени мы показываем подписями. Альтернатива —
+    // X = millisecondsSinceEpoch, но тогда между «нет данных» бакетами
+    // получится пустота, что иногда хуже читается.
+    final times = <DateTime>[];
+    final spots = <FlSpot>[];
+    for (int i = 0; i < trend.length; i++) {
+      final p = trend[i] as Map;
+      times.add(_parse(p['bucket'] as String));
+      spots.add(FlSpot(i.toDouble(), (p['mean'] as num).toDouble()));
+    }
+
+    final yMax = spots.fold<double>(spots.first.y, (m, s) => s.y > m ? s.y : m);
+    final yMin = spots.fold<double>(spots.first.y, (m, s) => s.y < m ? s.y : m);
+    final yPad = (yMax - yMin) * 0.1;
+    // Подбираем шаг подписей на X, чтобы не было сплошной каши на
+    // длинных рядах: показываем ~6 подписей всего.
+    final xLabelStep = (trend.length / 6).ceil().clamp(1, trend.length);
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8, left: 4),
+        child: Text(
+          'Среднее значение по времени · бакет $_binHuman · только завершённые',
+          style: const TextStyle(
+              fontFamily: 'HSESans',
+              fontSize: 11,
+              color: HseColors.muted),
+        ),
+      ),
+      SizedBox(
+        height: 220,
+        child: LineChart(LineChartData(
+          minY: yMin - yPad,
+          maxY: yMax + yPad,
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              curveSmoothness: 0.2,
+              color: HseColors.primary,
+              barWidth: 3,
+              dotData: const FlDotData(show: true),
+              belowBarData: BarAreaData(
+                show: true,
+                color: HseColors.primary.withOpacity(0.12),
+              ),
+            ),
+          ],
+          lineTouchData: LineTouchData(
+            touchTooltipData: LineTouchTooltipData(
+              getTooltipItems: (touched) => touched.map((s) {
+                final i = s.x.toInt();
+                if (i < 0 || i >= trend.length) return null;
+                final p = trend[i] as Map;
+                return LineTooltipItem(
+                  '${_tooltipLabel(times[i])}\n'
+                  'M = ${(p['mean'] as num).toStringAsFixed(2)} · N = ${p['n']}',
+                  const TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'HSESans',
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600),
+                );
+              }).toList(),
             ),
           ),
-        ],
-        titlesData: const FlTitlesData(
-          leftTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: true, reservedSize: 32)),
-          bottomTitles: AxisTitles(
+          titlesData: FlTitlesData(
+            leftTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: true, reservedSize: 36)),
+            bottomTitles: AxisTitles(
               sideTitles: SideTitles(
-                  showTitles: true, reservedSize: 24, interval: 1)),
-          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                showTitles: true,
+                reservedSize: 28,
+                interval: xLabelStep.toDouble(),
+                getTitlesWidget: (v, _) {
+                  final i = v.toInt();
+                  if (i < 0 || i >= times.length) return const SizedBox();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(_label(times[i]),
+                        style: const TextStyle(
+                            fontFamily: 'HSESans', fontSize: 10)),
+                  );
+                },
+              ),
+            ),
+            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          ),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            getDrawingHorizontalLine: (_) =>
+                const FlLine(color: HseColors.border, strokeWidth: 0.5),
+          ),
+          borderData: FlBorderData(show: false),
+        )),
+      ),
+    ]);
+  }
+
+  /// Серая «нет данных»-плашка вместо графика — для случаев, когда тренд
+  /// нельзя построить (0 или 1 точка во времени).
+  Widget _emptyHint(String text) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: HseColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(HseRadius.md),
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Icon(Icons.timeline_rounded,
+            size: 18, color: HseColors.muted),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(text,
+              style: const TextStyle(
+                  fontFamily: 'HSESans',
+                  fontSize: 12.5,
+                  color: HseColors.inkSoft,
+                  height: 1.4)),
         ),
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          getDrawingHorizontalLine: (_) =>
-              const FlLine(color: HseColors.border, strokeWidth: 0.5),
-        ),
-        borderData: FlBorderData(show: false),
-      )),
+      ]),
     );
   }
 }

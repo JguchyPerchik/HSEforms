@@ -124,6 +124,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         padding: const EdgeInsets.only(bottom: 12),
                         child: QuestionAnalyticsCard(
                           question: (q as Map).cast<String, dynamic>(),
+                          // trend_bin — шаг бакетов для тренда, общий
+                          // для всего опроса. Бэк выбирает авто по
+                          // разбросу submitted_at. Фолбэк на 'day' нужен
+                          // на случай, если фронт пересоберут с новым
+                          // кодом раньше, чем выкатят backend (старый
+                          // ответ не содержит этого поля).
+                          trendBin:
+                              (data!['trend_bin'] as String?) ?? 'day',
                         ),
                       ),
                   ],
