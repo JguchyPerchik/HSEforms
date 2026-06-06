@@ -195,85 +195,88 @@ class _RunnerScreenState extends State<RunnerScreen> {
     }
   }
 
+  PreferredSizeWidget? _previewAppBar() {
+    if (!widget.isCreatorPreview) return null;
+    return AppBar(
+      automaticallyImplyLeading: false,
+      backgroundColor: Colors.white,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      toolbarHeight: 52,
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: Tooltip(
+            message: 'Выйти из предпросмотра',
+            child: GestureDetector(
+              onTap: () => context.go('/builder/${survey!.id}'),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: HseColors.primary,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.visibility_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_busy && survey == null)
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_busy && survey == null) {
+      return Scaffold(
+        appBar: _previewAppBar(),
+        body: const Center(child: CircularProgressIndicator()));
+    }
     if (_error != null) return Scaffold(body: Center(child: Text(_error!)));
-    if (survey == null)
+    if (survey == null) {
       return const Scaffold(
           body: Center(
               child: Text('Опрос не найден',
                   style: TextStyle(fontFamily: 'HSESans'))));
+    }
 
     final s = survey!;
     if (_done) {
       return Scaffold(
+        appBar: _previewAppBar(),
         backgroundColor: _bg(s),
-        appBar: widget.isCreatorPreview
-            ? AppBar(
-                automaticallyImplyLeading: false,
-                backgroundColor: Colors.white,
-                elevation: 0,
-                scrolledUnderElevation: 0,
-                toolbarHeight: 52,
-                actions: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: Tooltip(
-                      message: 'Выйти из предпросмотра',
-                      child: GestureDetector(
-                        onTap: () => context.go('/builder/${survey!.id}'),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: HseColors.primary,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.visibility_rounded,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                        ),
-                      ),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(40),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: _primary(s).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
                     ),
+                    child: Icon(Icons.check_circle_rounded,
+                        color: _primary(s), size: 56),
                   ),
-                ],
-              )
-            : null,
-        body: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(40),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: _primary(s).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Icon(Icons.check_circle_rounded,
-                          color: _primary(s), size: 56),
-                    ),
-                    const SizedBox(height: 18),
-                    Text('Спасибо!',
-                        style: Theme.of(context).textTheme.displayMedium),
-                    const SizedBox(height: 6),
-                    Text(
-                      _isPreview
-                          ? 'Предпросмотр завершён'
-                          : 'Ваш ответ записан',
-                      style: const TextStyle(
-                          fontFamily: 'HSESans',
-                          color: HseColors.muted,
-                          fontSize: 15),
-                    ),
-                  ]),
-                ),
+                  const SizedBox(height: 18),
+                  Text('Спасибо!',
+                      style: Theme.of(context).textTheme.displayMedium),
+                  const SizedBox(height: 6),
+                  Text(
+                    _isPreview ? 'Предпросмотр завершён' : 'Ваш ответ записан',
+                    style: const TextStyle(
+                        fontFamily: 'HSESans',
+                        color: HseColors.muted,
+                        fontSize: 15),
+                  ),
+                ]),
               ),
             ),
           ),
