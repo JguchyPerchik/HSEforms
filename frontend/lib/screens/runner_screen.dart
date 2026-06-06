@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:web/web.dart' as web;
 
 import '../api/api.dart';
 import '../api/api_client.dart';
@@ -9,6 +10,21 @@ import '../models/models.dart';
 import '../theme.dart';
 import '../widgets/question_renderer.dart';
 import '../utils/conditional.dart';
+
+/// Куда вести по кнопке «Оставить отзыв» на экране «Спасибо».
+///
+/// Сейчас — mailto, потому что:
+///   1. Работает в любом браузере / на любой ОС без настройки.
+///   2. Не требует поднимать форму на стороннем сервисе (Google Forms /
+///      Tally / Typeform) и хранить её URL в конфиге.
+///   3. Пользователь сразу видит, куда уходит письмо — это честнее, чем
+///      «оставьте отзыв» с непонятным редиректом.
+///
+/// Когда появится отдельная страница сбора фидбэка — сменить на её URL
+/// (или прокинуть через --dart-define=FEEDBACK_URL=..., как сделано
+/// с API_BASE в api_client.dart).
+const String _feedbackUrl =
+    'mailto:hello@hseforms.ru?subject=Отзыв%20о%20HSE%20Forms';
 
 class RunnerScreen extends StatefulWidget {
   final String slug;
@@ -249,32 +265,110 @@ class _RunnerScreenState extends State<RunnerScreen> {
       return Scaffold(
         appBar: _previewAppBar(),
         backgroundColor: _bg(s),
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(40),
+        // Оборачиваем в SingleChildScrollView: с добавлением CTA + feedback
+        // карточка может перерасти viewport на маленьких экранах. Без
+        // прокрутки получили бы RenderFlex overflow.
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: _primary(s).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(40),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: _primary(s).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Icon(Icons.check_circle_rounded,
+                              color: _primary(s), size: 56),
+                        ),
+                        const SizedBox(height: 18),
+                        Text('Спасибо!',
+                            style: Theme.of(context).textTheme.displayMedium),
+                        const SizedBox(height: 6),
+                        Text(
+                          _isPreview
+                              ? 'Предпросмотр завершён'
+                              : 'Ваш ответ записан',
+                          style: const TextStyle(
+                              fontFamily: 'HSESans',
+                              color: HseColors.muted,
+                              fontSize: 15),
+                          textAlign: TextAlign.center,
+                        ),
+                        // В preview-режиме CTA «Создать свой опрос» не
+                        // имеет смысла — пользователь и так владелец
+                        // платформы, у него есть верхняя иконка возврата
+                        // в редактор. Скрываем, чтобы не путать.
+                        if (!_isPreview) ...[
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () => context.go('/login'),
+                              icon: const Icon(
+                                  Icons.add_circle_outline_rounded, size: 18),
+                              label: const Text('Создать свой опрос'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _primary(s),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 24, vertical: 14),
+                                textStyle: const TextStyle(
+                                  fontFamily: 'HSESans',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(HseRadius.sm),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Войдите или зарегистрируйтесь в HSE Forms — '
+                            'это бесплатно для исследователей.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                fontFamily: 'HSESans',
+                                color: HseColors.muted,
+                                fontSize: 12,
+                                height: 1.35),
+                          ),
+                        ],
+                      ]),
                     ),
-                    child: Icon(Icons.check_circle_rounded,
-                        color: _primary(s), size: 56),
                   ),
-                  const SizedBox(height: 18),
-                  Text('Спасибо!',
-                      style: Theme.of(context).textTheme.displayMedium),
-                  const SizedBox(height: 6),
-                  Text(
-                    _isPreview ? 'Предпросмотр завершён' : 'Ваш ответ записан',
-                    style: const TextStyle(
+                  // Мелкий feedback-линк ПОД карточкой, намеренно ненавязчивый
+                  // — приоритет визуально остаётся за CTA. Серый, без рамки.
+                  // Внешний tab открываем через web.window.open: respondent
+                  // продолжит видеть «Спасибо!» в исходной вкладке, плюс
+                  // mailto не отрывает его от страницы.
+                  const SizedBox(height: 14),
+                  TextButton.icon(
+                    onPressed: () {
+                      web.window.open(_feedbackUrl, '_blank');
+                    },
+                    icon: const Icon(Icons.chat_bubble_outline_rounded,
+                        size: 14),
+                    label: const Text('Оставить отзыв о платформе'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: HseColors.muted,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      textStyle: const TextStyle(
                         fontFamily: 'HSESans',
-                        color: HseColors.muted,
-                        fontSize: 15),
+                        fontSize: 12.5,
+                      ),
+                    ),
                   ),
                 ]),
               ),
