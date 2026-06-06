@@ -2,7 +2,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:web/web.dart' as web;
 
 import '../api/api.dart';
 import '../api/api_client.dart';
@@ -10,21 +9,6 @@ import '../models/models.dart';
 import '../theme.dart';
 import '../widgets/question_renderer.dart';
 import '../utils/conditional.dart';
-
-/// Куда вести по кнопке «Оставить отзыв» на экране «Спасибо».
-///
-/// Сейчас — mailto, потому что:
-///   1. Работает в любом браузере / на любой ОС без настройки.
-///   2. Не требует поднимать форму на стороннем сервисе (Google Forms /
-///      Tally / Typeform) и хранить её URL в конфиге.
-///   3. Пользователь сразу видит, куда уходит письмо — это честнее, чем
-///      «оставьте отзыв» с непонятным редиректом.
-///
-/// Когда появится отдельная страница сбора фидбэка — сменить на её URL
-/// (или прокинуть через --dart-define=FEEDBACK_URL=..., как сделано
-/// с API_BASE в api_client.dart).
-const String _feedbackUrl =
-    'mailto:hello@hseforms.ru?subject=Отзыв%20о%20HSE%20Forms';
 
 class RunnerScreen extends StatefulWidget {
   final String slug;
@@ -45,6 +29,14 @@ class _RunnerScreenState extends State<RunnerScreen> {
   String? _error;
   final Map<int, Map<String, dynamic>> answers = {};
 
+  /// Контроллер прокрутки тела опроса. Нужен, чтобы при переходе «Далее»/
+  /// «Назад» сбрасывать положение скролла в начало новой страницы — иначе
+  /// SingleChildScrollView сохраняет позицию (пользователь нажал кнопку
+  /// внизу — там и остаётся, хотя контент уже другой). Особенно жёстко
+  /// это видно, если первая страница длинная, а вторая короткая: после
+  /// тапа «Далее» получаешь пустой экран и «теряешь» новые вопросы выше.
+  final ScrollController _scrollCtrl = ScrollController();
+
   /// Per-question variant assignment computed once per session.
   /// Value: -1 = skipped, 0 = original, 1..n = variant index (1-based; n = variants[n-1]).
   final Map<int, int> _variantAssignment = {};
@@ -56,6 +48,28 @@ class _RunnerScreenState extends State<RunnerScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Сменить страницу и проскроллить тело в начало. Скролл откладываем на
+  /// post-frame: в момент вызова контроллер ещё привязан к СТАРОМУ layout'у,
+  /// и animateTo(0) визуально просто «дёрнется» в той же позиции. После
+  /// build()'a controller уже видит новую высоту контента и доедет корректно.
+  void _goToPage(int newIndex) {
+    setState(() => pageIndex = newIndex);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollCtrl.hasClients) return;
+      _scrollCtrl.animateTo(
+        0,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   Future<void> _load() async {
@@ -314,12 +328,12 @@ class _RunnerScreenState extends State<RunnerScreen> {
                               onPressed: () => context.go('/login'),
                               icon: const Icon(
                                   Icons.add_circle_outline_rounded, size: 18),
-                              label: const Text('Создать свой опрос'),
+                              label: const Text('Создай свой первый опрос!'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _primary(s),
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 24, vertical: 14),
+                                    horizontal: 24, vertical: 18),
                                 textStyle: const TextStyle(
                                   fontFamily: 'HSESans',
                                   fontWeight: FontWeight.w700,
@@ -334,40 +348,17 @@ class _RunnerScreenState extends State<RunnerScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Войдите или зарегистрируйтесь в HSE Forms — '
-                            'это бесплатно для исследователей.',
+                            'Ты прошел опрос на новой платформе HSEForms, '
+                            'если хочешь потыкать, регистрируйся',
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                                 fontFamily: 'HSESans',
                                 color: HseColors.muted,
-                                fontSize: 12,
+                                fontSize: 16,
                                 height: 1.35),
                           ),
                         ],
                       ]),
-                    ),
-                  ),
-                  // Мелкий feedback-линк ПОД карточкой, намеренно ненавязчивый
-                  // — приоритет визуально остаётся за CTA. Серый, без рамки.
-                  // Внешний tab открываем через web.window.open: respondent
-                  // продолжит видеть «Спасибо!» в исходной вкладке, плюс
-                  // mailto не отрывает его от страницы.
-                  const SizedBox(height: 14),
-                  TextButton.icon(
-                    onPressed: () {
-                      web.window.open(_feedbackUrl, '_blank');
-                    },
-                    icon: const Icon(Icons.chat_bubble_outline_rounded,
-                        size: 14),
-                    label: const Text('Оставить отзыв о платформе'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: HseColors.muted,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      textStyle: const TextStyle(
-                        fontFamily: 'HSESans',
-                        fontSize: 12.5,
-                      ),
                     ),
                   ),
                 ]),
@@ -401,6 +392,7 @@ class _RunnerScreenState extends State<RunnerScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: SingleChildScrollView(
+              controller: _scrollCtrl,
               padding: const EdgeInsets.all(24),
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -493,7 +485,7 @@ class _RunnerScreenState extends State<RunnerScreen> {
                           icon: const Icon(Icons.arrow_back_rounded),
                           label: const Text('Назад',
                               style: TextStyle(fontFamily: 'HSESans')),
-                          onPressed: () => setState(() => pageIndex -= 1),
+                          onPressed: () => _goToPage(pageIndex - 1),
                         ),
                       const Spacer(),
                       ElevatedButton.icon(
@@ -513,7 +505,7 @@ class _RunnerScreenState extends State<RunnerScreen> {
                                 if (isLast) {
                                   _submit();
                                 } else {
-                                  setState(() => pageIndex += 1);
+                                  _goToPage(pageIndex + 1);
                                 }
                               },
                       ),
