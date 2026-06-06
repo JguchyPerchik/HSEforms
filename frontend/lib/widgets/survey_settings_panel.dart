@@ -23,18 +23,24 @@ class SurveySettingsPanel extends StatelessWidget {
   final Future<void> Function(Map<String, dynamic>) onSettingsChanged;
   final Future<void> Function()? onCreateVariant;
   final void Function(int variantId)? onOpenVariant;
-  final Future<void> Function(int variantId, double weight)? onChangeVariantWeight;
+  final Future<void> Function(int variantId, double weight)?
+      onChangeVariantWeight;
   final Future<void> Function(int variantId)? onDeleteVariant;
+
   /// Сбросить round-robin счётчик опроса (вернуть к началу очереди).
   final Future<void> Function()? onResetAssignment;
 
   const SurveySettingsPanel({
-    super.key, required this.survey,
+    super.key,
+    required this.survey,
     required this.currentSurveyId,
     this.parent,
-    required this.onAddQuestion, required this.onSettingsChanged,
-    this.onCreateVariant, this.onOpenVariant,
-    this.onChangeVariantWeight, this.onDeleteVariant,
+    required this.onAddQuestion,
+    required this.onSettingsChanged,
+    this.onCreateVariant,
+    this.onOpenVariant,
+    this.onChangeVariantWeight,
+    this.onDeleteVariant,
     this.onResetAssignment,
   });
 
@@ -50,7 +56,8 @@ class SurveySettingsPanel extends StatelessWidget {
         _SectionHeader(text: 'ДОБАВИТЬ ВОПРОС'),
         const SizedBox(height: 10),
         Wrap(spacing: 8, runSpacing: 8, children: [
-          for (final t in QuestionType.values) _QuestionTypeChip(type: t, onTap: () => onAddQuestion(t)),
+          for (final t in QuestionType.values)
+            _QuestionTypeChip(type: t, onTap: () => onAddQuestion(t)),
         ]),
         const SizedBox(height: 28),
         _SectionHeader(text: 'НАСТРОЙКИ ОПРОСА'),
@@ -88,17 +95,21 @@ class SurveySettingsPanel extends StatelessWidget {
             color: HseColors.surfaceAlt,
             borderRadius: BorderRadius.circular(HseRadius.md),
           ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Icon(Icons.shuffle_rounded, size: 18, color: HseColors.primaryBright),
-              const SizedBox(width: 8),
-              const Text('Как это работает', style: TextStyle(fontWeight: FontWeight.w700)),
+              Icon(Icons.shuffle_rounded,
+                  size: 18, color: HseColors.primaryBright),
+              SizedBox(width: 8),
+              Text('Как это работает',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
             ]),
-            const SizedBox(height: 6),
-            const Text(
-              'Создайте 2+ вариантов опроса. Респондентам можно раздавать '
-              'их случайно (по весам) или строго по очереди — выберите ниже.',
-              style: TextStyle(color: HseColors.inkSoft, fontSize: 13, height: 1.4),
+            SizedBox(height: 6),
+            Text(
+              'Создайте 2+ вариантов опроса. '
+              'Выберите ниже, как система будет их распределять: случайным образом (по весам) или по очереди',
+              style: TextStyle(
+                  color: HseColors.inkSoft, fontSize: 13, height: 1.4),
             ),
           ]),
         ),
@@ -129,17 +140,19 @@ class SurveySettingsPanel extends StatelessWidget {
         // подсвечен рамкой+фоном и некликабельный, остальные кликаются как
         // табы — клик дёргает onOpenVariant, который ведёт на /builder/<id>.
         Row(children: [
-          Expanded(child: Text(
+          Expanded(
+              child: Text(
             _root.variants.isEmpty
                 ? 'Вариантов пока нет'
                 : 'Варианты (${_root.variants.length + 1})', // +1 за основной
             style: const TextStyle(fontWeight: FontWeight.w700),
           )),
-          if (onCreateVariant != null) TextButton.icon(
-            icon: const Icon(Icons.add_rounded, size: 16),
-            label: const Text('Добавить'),
-            onPressed: () => onCreateVariant!(),
-          ),
+          if (onCreateVariant != null)
+            TextButton.icon(
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: const Text('Добавить'),
+              onPressed: () => onCreateVariant!(),
+            ),
         ]),
         const SizedBox(height: 6),
         if (_root.variants.isEmpty)
@@ -152,7 +165,8 @@ class SurveySettingsPanel extends StatelessWidget {
             ),
             child: const Text(
               'Нажмите «Добавить», чтобы создать копию текущего опроса. ',
-              style: TextStyle(color: HseColors.muted, fontSize: 12.5, height: 1.4),
+              style: TextStyle(
+                  color: HseColors.muted, fontSize: 12.5, height: 1.4),
             ),
           )
         else ...[
@@ -168,19 +182,25 @@ class SurveySettingsPanel extends StatelessWidget {
             // child-варианты. Поэтому onDelete всегда null.
             onSelect: _root.id == currentSurveyId
                 ? null
-                : (onOpenVariant != null ? () => onOpenVariant!(_root.id) : null),
+                : (onOpenVariant != null
+                    ? () => onOpenVariant!(_root.id)
+                    : null),
             onDelete: null,
           ),
           ..._root.variants.map((v) => _VariantRow(
-            label: v.variantLabel ?? v.title,
-            weight: v.variantWeight,
-            isMain: false,
-            isCurrent: v.id == currentSurveyId,
-            onSelect: v.id == currentSurveyId
-                ? null // мы уже здесь — не даём кликнуть на самого себя
-                : (onOpenVariant != null ? () => onOpenVariant!(v.id) : null),
-            onDelete: onDeleteVariant != null ? () => onDeleteVariant!(v.id) : null,
-          )),
+                label: v.variantLabel ?? v.title,
+                weight: v.variantWeight,
+                isMain: false,
+                isCurrent: v.id == currentSurveyId,
+                onSelect: v.id == currentSurveyId
+                    ? null // мы уже здесь — не даём кликнуть на самого себя
+                    : (onOpenVariant != null
+                        ? () => onOpenVariant!(v.id)
+                        : null),
+                onDelete: onDeleteVariant != null
+                    ? () => onDeleteVariant!(v.id)
+                    : null,
+              )),
         ],
         const SizedBox(height: 28),
         _SectionHeader(text: 'ССЫЛКА'),
@@ -209,8 +229,10 @@ class _SectionHeader extends StatelessWidget {
     return Text(
       text,
       style: const TextStyle(
-        color: HseColors.muted, fontSize: 11,
-        fontWeight: FontWeight.w800, letterSpacing: 1.2,
+        color: HseColors.muted,
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.2,
       ),
     );
   }
@@ -221,16 +243,25 @@ class _Setting extends StatelessWidget {
   final String subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
-  const _Setting({required this.title, required this.subtitle, required this.value, required this.onChanged});
+  const _Setting(
+      {required this.title,
+      required this.subtitle,
+      required this.value,
+      required this.onChanged});
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(children: [
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title,
+              style:
+                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
           const SizedBox(height: 2),
-          Text(subtitle, style: const TextStyle(color: HseColors.muted, fontSize: 12)),
+          Text(subtitle,
+              style: const TextStyle(color: HseColors.muted, fontSize: 12)),
         ])),
         Switch(value: value, onChanged: onChanged),
       ]),
@@ -245,17 +276,24 @@ class _QuestionTypeChip extends StatelessWidget {
 
   IconData get _icon {
     switch (type) {
-      case QuestionType.short_text: return Icons.short_text_rounded;
-      case QuestionType.long_text: return Icons.notes_rounded;
-      case QuestionType.single_choice: return Icons.radio_button_checked_rounded;
-      case QuestionType.multiple_choice: return Icons.check_box_outlined;
-      case QuestionType.dropdown: return Icons.expand_circle_down_outlined;
-      case QuestionType.scale: return Icons.linear_scale_rounded;
+      case QuestionType.short_text:
+        return Icons.short_text_rounded;
+      case QuestionType.long_text:
+        return Icons.notes_rounded;
+      case QuestionType.single_choice:
+        return Icons.radio_button_checked_rounded;
+      case QuestionType.multiple_choice:
+        return Icons.check_box_outlined;
+      case QuestionType.dropdown:
+        return Icons.expand_circle_down_outlined;
+      case QuestionType.scale:
+        return Icons.linear_scale_rounded;
       // case QuestionType.rating: return Icons.star_outline_rounded;
       // case QuestionType.number: return Icons.numbers_rounded;
       // case QuestionType.date: return Icons.calendar_today_rounded;
       // case QuestionType.email: return Icons.alternate_email_rounded;
-      case QuestionType.section_header: return Icons.title_rounded;
+      case QuestionType.section_header:
+        return Icons.title_rounded;
     }
   }
 
@@ -276,7 +314,9 @@ class _QuestionTypeChip extends StatelessWidget {
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(_icon, size: 16, color: HseColors.primary),
             const SizedBox(width: 6),
-            Text(type.human, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            Text(type.human,
+                style:
+                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
           ]),
         ),
       ),
@@ -288,6 +328,7 @@ class _AssignmentModeSelector extends StatelessWidget {
   final String mode;
   final Future<void> Function(String) onChanged;
   final Future<void> Function()? onReset;
+
   /// true — селектор показан, но клики и кнопка сброса отключены.
   /// Используется, когда панель открыта из child-варианта: режим раздачи
   /// и счётчик живут на корне, менять их «через child» не имеет смысла —
@@ -316,7 +357,8 @@ class _AssignmentModeSelector extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена', style: TextStyle(fontFamily: 'HSESans')),
+            child:
+                const Text('Отмена', style: TextStyle(fontFamily: 'HSESans')),
           ),
           TextButton(
             style: TextButton.styleFrom(foregroundColor: HseColors.danger),
@@ -330,8 +372,9 @@ class _AssignmentModeSelector extends StatelessWidget {
       await onReset!();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Счётчик сброшен',
-              style: TextStyle(fontFamily: 'HSESans'))),
+          const SnackBar(
+              content: Text('Счётчик сброшен',
+                  style: TextStyle(fontFamily: 'HSESans'))),
         );
       }
     }
@@ -354,7 +397,7 @@ class _AssignmentModeSelector extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Раздача вариантов',
+            const Text('Распределение вариантов',
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
             const SizedBox(height: 8),
             // SegmentedButton + ширина 340px у боковой панели = переполнение.
@@ -363,8 +406,8 @@ class _AssignmentModeSelector extends StatelessWidget {
               selected: mode == 'random',
               icon: Icons.casino_outlined,
               title: 'Случайно (по весам)',
-              subtitle: 'Каждый респондент получает вариант случайно. Веса '
-                  'задают пропорцию на большой выборке.',
+              subtitle: 'Вариант опроса определяется случайным образом. '
+                  'Заданные веса обеспечивают нужное процентное соотношение на больших выборках.',
               onTap: disabled ? null : () => onChanged('random'),
             ),
             const SizedBox(height: 6),
@@ -372,8 +415,9 @@ class _AssignmentModeSelector extends StatelessWidget {
               selected: isRR,
               icon: Icons.format_list_numbered_rounded,
               title: 'По очереди',
-              subtitle: 'Респонденты по очереди получают варианты в '
-                  'круг. Точное равное распределение на малой выборке.',
+              subtitle:
+                  'Респонденты получают варианты последовательно по кругу. '
+                  'Гарантирует строго равное разделение групп даже на малых выборках.',
               onTap: disabled ? null : () => onChanged('round_robin'),
             ),
             if (isRR && onReset != null && !disabled) ...[
@@ -412,6 +456,7 @@ class _ModeOption extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+
   /// null — опция показана, но не реагирует на тап (disabled-режим).
   /// Используется, когда селектор открыт из child-варианта (см.
   /// [_AssignmentModeSelector.disabled]).
@@ -441,25 +486,28 @@ class _ModeOption extends StatelessWidget {
             ),
           ),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Icon(icon, size: 18,
+            Icon(icon,
+                size: 18,
                 color: selected ? HseColors.primary : HseColors.muted),
             const SizedBox(width: 10),
             Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      color: selected ? HseColors.primary : HseColors.ink,
-                    )),
-                const SizedBox(height: 2),
-                Text(subtitle,
-                    style: const TextStyle(
-                      color: HseColors.muted,
-                      fontSize: 11.5,
-                      height: 1.35,
-                    )),
-              ]),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: selected ? HseColors.primary : HseColors.ink,
+                        )),
+                    const SizedBox(height: 2),
+                    Text(subtitle,
+                        style: const TextStyle(
+                          color: HseColors.muted,
+                          fontSize: 11.5,
+                          height: 1.35,
+                        )),
+                  ]),
             ),
           ]),
         ),
@@ -475,17 +523,23 @@ class _ModeOption extends StatelessWidget {
 class _VariantRow extends StatelessWidget {
   final String label;
   final double weight;
+
   /// true — корневой опрос. Влияет на иконку и подпись «Основной».
   final bool isMain;
+
   /// true — этот вариант сейчас открыт. На него нельзя кликнуть.
   final bool isCurrent;
+
   /// null — строка некликабельна (это активный вариант, или нет коллбэка).
   final VoidCallback? onSelect;
   final VoidCallback? onDelete;
   const _VariantRow({
-    required this.label, required this.weight, required this.isMain,
+    required this.label,
+    required this.weight,
+    required this.isMain,
     required this.isCurrent,
-    this.onSelect, this.onDelete,
+    this.onSelect,
+    this.onDelete,
   });
   @override
   Widget build(BuildContext context) {
@@ -525,7 +579,8 @@ class _VariantRow extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Flexible(
                 child: Text(label,
@@ -539,7 +594,8 @@ class _VariantRow extends StatelessWidget {
               if (isCurrent) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: HseColors.primary,
                     borderRadius: BorderRadius.circular(4),
@@ -560,14 +616,15 @@ class _VariantRow extends StatelessWidget {
                 style: const TextStyle(color: HseColors.muted, fontSize: 11)),
           ]),
         ),
-        if (onDelete != null) IconButton(
-          icon: const Icon(Icons.delete_outline_rounded, size: 16),
-          tooltip: 'Удалить вариант',
-          onPressed: onDelete,
-          // Иконка удаления внутри кликабельной строки — её собственный
-          // onTap «всплыл» бы и до родительского InkWell тоже, дёргая
-          // переключение. Закрываем splash и не даём событию подняться.
-        ),
+        if (onDelete != null)
+          IconButton(
+            icon: const Icon(Icons.delete_outline_rounded, size: 16),
+            tooltip: 'Удалить вариант',
+            onPressed: onDelete,
+            // Иконка удаления внутри кликабельной строки — её собственный
+            // onTap «всплыл» бы и до родительского InkWell тоже, дёргая
+            // переключение. Закрываем splash и не даём событию подняться.
+          ),
       ]),
     );
 

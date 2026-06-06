@@ -214,10 +214,10 @@ class _PageBreakRailState extends State<PageBreakRail> {
             child: InkWell(
               borderRadius: BorderRadius.circular(999),
               onTap: widget.onToggle,
-              child: Padding(
+              child: const Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                child: Row(mainAxisSize: MainAxisSize.min, children: const [
+                    EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.insert_page_break_rounded,
                       size: 14, color: Colors.white),
                   SizedBox(width: 6),
