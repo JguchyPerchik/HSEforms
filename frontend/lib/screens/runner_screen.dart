@@ -300,6 +300,7 @@ class _RunnerScreenState extends State<RunnerScreen> {
     final isFirst = pageIndex == 0;
 
     return Scaffold(
+      appBar: _previewAppBar(),
       backgroundColor: _bg(s),
       body: SafeArea(
         child: Center(
