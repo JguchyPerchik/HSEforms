@@ -67,7 +67,10 @@ class _HseFormsAppState extends State<HseFormsApp> {
         ),
         GoRoute(
           path: '/s/:slug',
-          builder: (_, s) => RunnerScreen(slug: s.pathParameters['slug']!),
+          builder: (_, s) => RunnerScreen(
+            slug: s.pathParameters['slug']!,
+            isCreatorPreview: s.uri.queryParameters['preview'] == 'true',
+          ),
         ),
       ],
     );

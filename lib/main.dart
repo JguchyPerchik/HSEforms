@@ -36,8 +36,6 @@ void main() async {
   );
 }
 
-// ── Loads persistence before showing UI ──────────────────────────────────────
-
 class _AppLoader extends StatefulWidget {
   const _AppLoader();
   @override
@@ -53,8 +51,6 @@ class _AppLoaderState extends State<_AppLoader> {
 
   @override
   Widget build(BuildContext context) {
-    // 1. ИСПОЛЬЗУЕМ SELECT! Слушаем только смену темы.
-    // Теперь при изменении store.loaded сам MaterialApp НЕ будет перерисовываться!
     final tgTheme = context.select<SurveyStore, TelegramThemeParams>((s) => s.tgTheme);
     final themeData = _buildTheme(tgTheme);
 
@@ -64,8 +60,6 @@ class _AppLoaderState extends State<_AppLoader> {
       theme: themeData,
       darkTheme: _buildTheme(TelegramThemeParams.dark),
       themeMode: tgTheme.isDark ? ThemeMode.dark : ThemeMode.light,
-      
-      // 2. Навигатор спокойно съедает URL /s/... и строит нужный экран
       onGenerateRoute: (settings) {
         final path = settings.name;
         
@@ -74,12 +68,8 @@ class _AppLoaderState extends State<_AppLoader> {
           return MaterialPageRoute(
             settings: settings,
             builder: (_) => Scaffold(
-              body: Center(
-                child: Text(
-                  'БИНГО! Опрос: $slug', 
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-              ),
+              appBar: AppBar(title: const Text('Опрос')),
+              body: Center(child: Text('ID: $slug')),
             ),
           );
         }
@@ -89,9 +79,6 @@ class _AppLoaderState extends State<_AppLoader> {
           builder: (_) => const HomeScreen(),
         );
       },
-
-      // 3. МАГИЯ ЗДЕСЬ: перехватываем отрисовку всего, что под навигатором.
-      // Navigator уже зафиксировал URL в браузере, мы просто вешаем шторку-лоадер.
       builder: (context, child) {
         final isLoaded = context.select<SurveyStore, bool>((s) => s.loaded);
         

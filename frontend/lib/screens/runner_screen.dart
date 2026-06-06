@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 
 import '../api/api.dart';
 import '../api/api_client.dart';
@@ -11,7 +12,9 @@ import '../utils/conditional.dart';
 
 class RunnerScreen extends StatefulWidget {
   final String slug;
-  const RunnerScreen({super.key, required this.slug});
+  final bool isCreatorPreview;
+  const RunnerScreen(
+      {super.key, required this.slug, this.isCreatorPreview = false});
   @override
   State<RunnerScreen> createState() => _RunnerScreenState();
 }
@@ -31,7 +34,7 @@ class _RunnerScreenState extends State<RunnerScreen> {
   final Map<int, int> _variantAssignment = {};
   int _seed = 0;
 
-  bool get _isPreview => responseId == null;
+  bool get _isPreview => widget.isCreatorPreview || responseId == null;
 
   @override
   void initState() {
@@ -43,7 +46,9 @@ class _RunnerScreenState extends State<RunnerScreen> {
     setState(() => _busy = true);
     try {
       survey = await _api.getBySlug(widget.slug);
-      if (survey != null && survey!.status == SurveyStatus.published) {
+      if (survey != null &&
+          survey!.status == SurveyStatus.published &&
+          !widget.isCreatorPreview) {
         final r = await _api.start(widget.slug);
         responseId = r['response_id'] as int?;
       }
@@ -158,7 +163,8 @@ class _RunnerScreenState extends State<RunnerScreen> {
           .map((e) => {'question_id': e.key, 'value': e.value})
           .toList();
       final assignments = <String, int>{
-        for (final entry in _variantAssignment.entries) entry.key.toString(): entry.value,
+        for (final entry in _variantAssignment.entries)
+          entry.key.toString(): entry.value,
       };
       await _api.submit(responseId!, list, variantAssignments: assignments);
       setState(() => _done = true);
@@ -204,34 +210,70 @@ class _RunnerScreenState extends State<RunnerScreen> {
     if (_done) {
       return Scaffold(
         backgroundColor: _bg(s),
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(40),
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: _primary(s).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
+        appBar: widget.isCreatorPreview
+            ? AppBar(
+                automaticallyImplyLeading: false,
+                backgroundColor: Colors.white,
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                toolbarHeight: 52,
+                actions: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Tooltip(
+                      message: 'Выйти из предпросмотра',
+                      child: GestureDetector(
+                        onTap: () => context.go('/builder/${survey!.id}'),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: HseColors.primary,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.visibility_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
+                      ),
                     ),
-                    child: Icon(Icons.check_circle_rounded,
-                        color: _primary(s), size: 56),
                   ),
-                  const SizedBox(height: 18),
-                  Text('Спасибо!',
-                      style: Theme.of(context).textTheme.displayMedium),
-                  const SizedBox(height: 6),
-                  Text(
-                    _isPreview ? 'Предпросмотр завершён' : 'Ваш ответ записан',
-                    style: const TextStyle(
-                        fontFamily: 'HSESans',
-                        color: HseColors.muted,
-                        fontSize: 15),
-                  ),
-                ]),
+                ],
+              )
+            : null,
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(40),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: _primary(s).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Icon(Icons.check_circle_rounded,
+                          color: _primary(s), size: 56),
+                    ),
+                    const SizedBox(height: 18),
+                    Text('Спасибо!',
+                        style: Theme.of(context).textTheme.displayMedium),
+                    const SizedBox(height: 6),
+                    Text(
+                      _isPreview
+                          ? 'Предпросмотр завершён'
+                          : 'Ваш ответ записан',
+                      style: const TextStyle(
+                          fontFamily: 'HSESans',
+                          color: HseColors.muted,
+                          fontSize: 15),
+                    ),
+                  ]),
+                ),
               ),
             ),
           ),

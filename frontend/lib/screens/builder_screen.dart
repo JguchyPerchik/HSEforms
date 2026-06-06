@@ -352,7 +352,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
     final previewBtn = IconButton(
       icon: const Icon(Icons.visibility_outlined),
       tooltip: 'Предпросмотр',
-      onPressed: () => context.go('/s/${s.slug}'),
+      onPressed: () => context.go('/s/${s.slug}?preview=true'),
     );
     final analyticsBtn = IconButton(
       icon: const Icon(Icons.bar_chart_rounded),
@@ -407,7 +407,7 @@ class _BuilderScreenState extends State<BuilderScreen> {
                     _openShare();
                     break;
                   case 'preview':
-                    context.go('/s/${s.slug}');
+                    context.go('/s/${s.slug}?preview=true');
                     break;
                   case 'analytics':
                     context.go('/analytics/${s.id}');
