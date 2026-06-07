@@ -4,7 +4,589 @@ import '../models/models.dart';
 import '../theme.dart';
 import 'condition_editor.dart';
 
-const _kOther = '__other__';
+class QuestionEditor extends StatelessWidget {
+  final int index;
+  final Question question;
+  final List<Question> availableTriggers;
+  final bool expanded;
+  final VoidCallback onTap;
+  final void Function(Question) onChanged;
+  final VoidCallback onSave;
+  final Future<void> Function() onDelete;
+  final VoidCallback? onTogglePageBreak;
+
+  const QuestionEditor({
+    super.key,
+    required this.index,
+    required this.question,
+    required this.availableTriggers,
+    required this.expanded,
+    required this.onTap,
+    required this.onChanged,
+    required this.onSave,
+    required this.onDelete,
+    required this.onTogglePageBreak,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final q = question;
+    final hasVariants = q.readVariants().isNotEmpty;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (index > 0)
+        PageBreakRail(
+          active: q.pageBreakBefore,
+          onToggle: onTogglePageBreak ?? () {},
+        ),
+      AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(HseRadius.lg),
+          boxShadow: expanded ? HseShadows.lift : HseShadows.card,
+          border: Border.all(
+            color: expanded
+                ? HseColors.primary.withOpacity(0.25)
+                : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
+            child: Row(children: [
+              ReorderableDragStartListener(
+                index: index,
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Icon(Icons.drag_indicator_rounded,
+                      color: HseColors.muted.withOpacity(0.7)),
+                ),
+              ),
+              Container(
+                width: 28,
+                height: 28,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: HseColors.surfaceAlt,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('${index + 1}',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: HseColors.primary,
+                        fontSize: 13)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(HseRadius.sm),
+                  onTap: onTap,
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            q.title.isEmpty ? 'Без заголовка' : q.title,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              color: q.title.isEmpty
+                                  ? HseColors.muted
+                                  : HseColors.ink,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Wrap(spacing: 8, runSpacing: 4, children: [
+                            _Tag(
+                                text: q.type.human,
+                                color: HseColors.surfaceAlt,
+                                fg: HseColors.primary),
+                            if (q.required)
+                              const _Tag(
+                                  text: 'обязательный',
+                                  color: Color(0x1AE05656),
+                                  fg: HseColors.danger),
+                            if (q.displayCondition != null)
+                              const _Tag(
+                                  text: 'условие',
+                                  color: Color(0x1A234B9B),
+                                  fg: HseColors.primaryBright),
+                            if (hasVariants)
+                              _Tag(
+                                  text: 'A/B (${q.readVariants().length + 1})',
+                                  color: const Color(0x1A2E9D6E),
+                                  fg: HseColors.success),
+                          ]),
+                        ]),
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded),
+                tooltip: 'Удалить',
+                color: HseColors.muted,
+                onPressed: () async {
+                  final ok = await showDialog<bool>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text('Удалить вопрос?'),
+                      content: const Text('Это действие нельзя отменить.'),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Отмена')),
+                        TextButton(
+                          style: TextButton.styleFrom(
+                              foregroundColor: HseColors.danger),
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('Удалить'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (ok == true) await onDelete();
+                },
+              ),
+              AnimatedRotation(
+                turns: expanded ? 0.5 : 0,
+                duration: const Duration(milliseconds: 220),
+                child: Icon(Icons.expand_more_rounded, color: HseColors.muted),
+              ),
+            ]),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: expanded
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    child: _ExpandedBody(
+                      key: ValueKey('body-${q.id}'),
+                      q: q,
+                      availableTriggers: availableTriggers,
+                      onChanged: onChanged,
+                      onSave: onSave,
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ]),
+      ),
+    ]);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// PAGE BREAK SEPARATOR
+// ─────────────────────────────────────────────────────────────────────────
+
+class PageBreakRail extends StatefulWidget {
+  final bool active;
+  final VoidCallback onToggle;
+  const PageBreakRail(
+      {super.key, required this.active, required this.onToggle});
+  @override
+  State<PageBreakRail> createState() => _PageBreakRailState();
+}
+
+class _PageBreakRailState extends State<PageBreakRail> {
+  bool _hover = false;
+  @override
+  Widget build(BuildContext context) {
+    if (widget.active) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(children: [
+          const Expanded(child: _DashedLine(color: HseColors.primaryBright)),
+          const SizedBox(width: 10),
+          Material(
+            color: HseColors.primary,
+            borderRadius: BorderRadius.circular(999),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: widget.onToggle,
+              child: const Padding(
+                padding:
+                    EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.insert_page_break_rounded,
+                      size: 14, color: Colors.white),
+                  SizedBox(width: 6),
+                  Text('Разделитель страницы',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12)),
+                  SizedBox(width: 6),
+                  Icon(Icons.close_rounded, size: 14, color: Colors.white70),
+                ]),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(child: _DashedLine(color: HseColors.primaryBright)),
+        ]),
+      );
+    }
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        onTap: widget.onToggle,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          height: 28,
+          alignment: Alignment.center,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 150),
+            opacity: _hover ? 1.0 : 0.0,
+            child: Row(children: [
+              Expanded(
+                  child: _DashedLine(color: HseColors.muted.withOpacity(0.5))),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: HseColors.borderStrong),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: const [
+                    Icon(Icons.add_rounded,
+                        size: 14, color: HseColors.primaryBright),
+                    SizedBox(width: 4),
+                    Text('Разделитель страницы',
+                        style: TextStyle(
+                            color: HseColors.primaryBright,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12)),
+                  ]),
+                ),
+              ),
+              Expanded(
+                  child: _DashedLine(color: HseColors.muted.withOpacity(0.5))),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashedLine extends StatelessWidget {
+  final Color color;
+  const _DashedLine({required this.color});
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+      size: const Size(double.infinity, 1), painter: _DashedLinePainter(color));
+}
+
+class _DashedLinePainter extends CustomPainter {
+  final Color color;
+  _DashedLinePainter(this.color);
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.2;
+    const dash = 5.0, gap = 4.0;
+    double x = 0;
+    while (x < size.width) {
+      canvas.drawLine(Offset(x, 0), Offset(x + dash, 0), paint);
+      x += dash + gap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_) => false;
+}
+
+class _Tag extends StatelessWidget {
+  final String text;
+  final Color color;
+  final Color fg;
+  const _Tag({required this.text, required this.color, required this.fg});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration:
+          BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)),
+      child: Text(text,
+          style:
+              TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// EXPANDED BODY
+// ─────────────────────────────────────────────────────────────────────────
+
+class _ExpandedBody extends StatefulWidget {
+  final Question q;
+  final List<Question> availableTriggers;
+  final void Function(Question) onChanged;
+  final VoidCallback onSave;
+  const _ExpandedBody(
+      {super.key,
+      required this.q,
+      required this.availableTriggers,
+      required this.onChanged,
+      required this.onSave});
+  @override
+  State<_ExpandedBody> createState() => _ExpandedBodyState();
+}
+
+class _ExpandedBodyState extends State<_ExpandedBody> {
+  void _commit() {
+    widget.onChanged(widget.q);
+    widget.onSave();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final q = widget.q;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const Divider(height: 1),
+      const SizedBox(height: 18),
+      // Variants pager handles BOTH the empty case (just inline original editor +
+      // "make experiment" CTA) and the pager case (original at page 0 + variants).
+      VariantsPager(
+        key: ValueKey('var-${q.id}'),
+        q: q,
+        onChanged: _commit,
+      ),
+      const SizedBox(height: 14),
+      // Common controls — apply to all variants of this question.
+      Container(
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+        decoration: BoxDecoration(
+          color: HseColors.surface,
+          borderRadius: BorderRadius.circular(HseRadius.md),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 4, bottom: 4),
+            child: Text('ОБЩИЕ НАСТРОЙКИ',
+                style: TextStyle(
+                    color: HseColors.muted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.0)),
+          ),
+          const Text(
+            'Применяются ко всем вариантам ниже.',
+            style: TextStyle(color: HseColors.inkSoft, fontSize: 12.5),
+          ),
+          const SizedBox(height: 6),
+          Wrap(spacing: 18, runSpacing: 4, children: [
+            _toggle('Обязательный', q.required, (v) {
+              q.required = v;
+              _commit();
+            }),
+          ]),
+          const SizedBox(height: 8),
+          if (widget.availableTriggers.isEmpty && q.displayCondition == null)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                'Условную логику можно добавить, если перед вопросом есть «Разделитель страницы».',
+                style: TextStyle(
+                    color: HseColors.muted, fontSize: 12.5, height: 1.4),
+              ),
+            )
+          else
+            ConditionEditor(
+              question: q,
+              previousQuestions: widget.availableTriggers,
+              onChanged: (cond) {
+                q.displayCondition = cond;
+                _commit();
+              },
+            ),
+        ]),
+      ),
+    ]);
+  }
+
+  Widget _toggle(String label, bool v, ValueChanged<bool> on) =>
+      Row(mainAxisSize: MainAxisSize.min, children: [
+        Switch(value: v, onChanged: on),
+        const SizedBox(width: 6),
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+      ]);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// SLOT — unifies "original Question" and "variant" so one page editor
+// can handle both with the same UI.
+// ─────────────────────────────────────────────────────────────────────────
+
+class _Slot {
+  final Question q;
+  final QuestionVariant? v; // null = editing the original question itself
+  _Slot.original(this.q) : v = null;
+  _Slot.variant(this.q, QuestionVariant variant) : v = variant;
+
+  bool get isOriginal => v == null;
+
+  QuestionType get type => v?.type ?? q.type;
+  set type(QuestionType t) {
+    if (v != null) {
+      v!.type = t;
+    } else {
+      q.type = t;
+    }
+  }
+
+  String get title => v?.title ?? q.title;
+  set title(String t) {
+    if (v != null) {
+      v!.title = t;
+    } else {
+      q.title = t;
+    }
+  }
+
+  String? get description => v != null ? v!.description : q.description;
+  set description(String? d) {
+    if (v != null) {
+      v!.description = d;
+    } else {
+      q.description = d;
+    }
+  }
+
+  List<QuestionOption> get options => v?.options ?? q.options;
+  Map<String, dynamic> get config => v?.config ?? q.config;
+
+  double get weight => v?.weight ?? q.originalWeight;
+  set weight(double w) {
+    if (v != null) {
+      v!.weight = w;
+    } else {
+      q.originalWeight = w;
+    }
+  }
+
+  bool get skip => v?.skip ?? false;
+  set skip(bool s) {
+    if (v != null) v!.skip = s;
+  }
+}
+
+/// Apply a type change to either Question or QuestionVariant via a Slot.
+void _applyTypeChange(_Slot slot, QuestionType newType) {
+  final old = slot.type;
+  if (old == newType) return;
+  slot.type = newType;
+
+  final cfg = slot.config;
+  cfg.remove('min');
+  cfg.remove('max');
+  cfg.remove('show_ticks');
+  cfg.remove('show_value');
+  cfg.remove('show_bounds');
+
+  bool isChoice(QuestionType t) =>
+      t == QuestionType.single_choice ||
+      t == QuestionType.multiple_choice ||
+      t == QuestionType.dropdown;
+
+  if (newType == QuestionType.scale) {
+    cfg['min'] = 1;
+    cfg['max'] = 5;
+    cfg['show_ticks'] = true;
+    cfg['show_value'] = true;
+    cfg['show_bounds'] = true;
+    slot.options.clear();
+  } else if (isChoice(newType)) {
+    if (!isChoice(old)) {
+      slot.options
+        ..clear()
+        ..add(QuestionOption(label: '', value: '', position: 0));
+    }
+    // switching between choice types — keep options
+  } else {
+    slot.options.clear();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// QUESTION TYPE PICKER
+// ─────────────────────────────────────────────────────────────────────────
+
+class QuestionTypePicker extends StatelessWidget {
+  final QuestionType value;
+  final ValueChanged<QuestionType> onChanged;
+  const QuestionTypePicker(
+      {super.key, required this.value, required this.onChanged});
+
+  IconData _iconFor(QuestionType t) {
+    switch (t) {
+      case QuestionType.short_text:
+        return Icons.short_text_rounded;
+      case QuestionType.long_text:
+        return Icons.notes_rounded;
+      case QuestionType.single_choice:
+        return Icons.radio_button_checked_rounded;
+      case QuestionType.multiple_choice:
+        return Icons.check_box_outlined;
+      case QuestionType.dropdown:
+        return Icons.expand_circle_down_outlined;
+      case QuestionType.scale:
+        return Icons.linear_scale_rounded;
+      // case QuestionType.rating:
+      //   return Icons.star_outline_rounded;
+      // case QuestionType.number:
+      //   return Icons.numbers_rounded;
+      // case QuestionType.date:
+      //   return Icons.calendar_today_rounded;
+      // case QuestionType.email:
+      //   return Icons.alternate_email_rounded;
+      case QuestionType.section_header:
+         return Icons.title_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<QuestionType>(
+      value: value,
+      isExpanded: true,
+      decoration: InputDecoration(labelText: 'Тип вопроса'),
+      items: QuestionType.values
+          .map((t) => DropdownMenuItem(
+                value: t,
+                child: Row(children: [
+                  Icon(_iconFor(t), size: 16, color: HseColors.primary),
+                  const SizedBox(width: 8),
+                  Text(t.human),
+                ]),
+              ))
+          .toList(),
+      onChanged: (v) {
+        if (v != null) onChanged(v);
+      },
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// OPTIONS EDITOR — generic, race-safe
+// ─────────────────────────────────────────────────────────────────────────
 
 class OptionsEditor extends StatefulWidget {
   final List<QuestionOption> options;
@@ -82,37 +664,12 @@ class _OptionsEditorState extends State<OptionsEditor> {
     });
     widget.onChanged();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _rows.isNotEmpty) {
-        // Фокусируем последнюю обычную строку (не «Другое»)
-        final idx = _rows.lastIndexWhere((r) => r.option.value != _kOther);
-        if (idx >= 0) _rows[idx].focus.requestFocus();
-      }
+      if (mounted && _rows.isNotEmpty) _rows.last.focus.requestFocus();
     });
-  }
-
-  // Добавляет специальный вариант «Другое» (sentinel value = _kOther).
-  // Вызов идемпотентен: если «Другое» уже есть — ничего не делает.
-  void _addOtherOption() {
-    if (widget.options.any((o) => o.value == _kOther)) return;
-    final opt = QuestionOption(
-      id: _newIdSeed--,
-      label: 'Другое',
-      value: _kOther,
-      position: _rows.length,
-    );
-    setState(() {
-      widget.options.add(opt);
-      _rows.add(_OptionRow(opt));
-    });
-    widget.onChanged();
   }
 
   void _removeAt(int i) {
-    final isOther = _rows[i].option.value == _kOther;
-    // Обычные варианты: не даём удалить последний.
-    // «Другое» можно убрать всегда (это не обязательный вариант).
-    if (!isOther && _rows.where((r) => r.option.value != _kOther).length <= 1)
-      return;
+    if (_rows.length <= 1) return;
     setState(() {
       _rows[i].dispose();
       _rows.removeAt(i);
@@ -124,6 +681,12 @@ class _OptionsEditorState extends State<OptionsEditor> {
     widget.onChanged();
   }
 
+  /// Перетаскивание варианта мышью. ReorderableListView корректирует
+  /// newIndex стандартным правилом (если двигаем вниз, надо вычесть 1).
+  /// После reorder синхронизируем три структуры:
+  ///   1. _rows — порядок UI-row'ов (контроллеры/фокусы)
+  ///   2. widget.options — данные модели
+  ///   3. .position у каждой option — чтобы сохранилось на бэке
   void _reorder(int oldIndex, int newIndex) {
     if (newIndex > oldIndex) newIndex -= 1;
     setState(() {
@@ -139,12 +702,17 @@ class _OptionsEditorState extends State<OptionsEditor> {
   }
 
   Widget _buildRow(int i) {
-    final isOther = _rows[i].option.value == _kOther;
-
     return Padding(
+      // ObjectKey по экземпляру _OptionRow: уникален, переживает reorder,
+      // позволяет Flutter правильно сопоставлять состояние TextField'а
+      // с правильной строкой при перестановке.
       key: ObjectKey(_rows[i]),
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(children: [
+        // Drag handle. Без ReorderableDragStartListener жест начинается
+        // только после long-press по любой части — это плохо UX (легко
+        // случайно перетащить, мешает выделять текст в поле). С явной
+        // ручкой жест ограничен только этой иконкой.
         ReorderableDragStartListener(
           index: i,
           child: const Padding(
@@ -156,78 +724,50 @@ class _OptionsEditorState extends State<OptionsEditor> {
         Icon(_bullet(), color: HseColors.muted, size: 18),
         const SizedBox(width: 10),
         Expanded(
-          child: isOther
-              // ── Вариант «Другое»: нередактируемая плашка ──────────────
-              ? Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                  decoration: BoxDecoration(
-                    color: HseColors.surface,
-                    borderRadius: BorderRadius.circular(HseRadius.sm),
-                    border: Border.all(
-                        color: HseColors.primaryBright.withOpacity(0.45)),
-                  ),
-                  child: const Row(children: [
-                    Icon(Icons.edit_note_rounded,
-                        size: 16, color: HseColors.primaryBright),
-                    SizedBox(width: 8),
-                    Text('Другое',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: HseColors.primaryBright,
-                            fontSize: 14)),
-                    SizedBox(width: 8),
-                    Text('(покажет текстовое поле)',
-                        style: TextStyle(fontSize: 12, color: HseColors.muted)),
-                  ]),
-                )
-              // ── Обычный вариант: редактируемое поле ───────────────────
-              : TextField(
-                  controller: _rows[i].controller,
-                  focusNode: _rows[i].focus,
-                  decoration: InputDecoration(
-                    isDense: true,
-                    hintText: 'Вариант ${i + 1}',
-                    filled: true,
-                    fillColor: HseColors.surface,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(HseRadius.sm),
-                        borderSide: BorderSide.none),
-                    enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(HseRadius.sm),
-                        borderSide: BorderSide.none),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(HseRadius.sm),
-                      borderSide: const BorderSide(
-                          color: HseColors.primaryBright, width: 1.5),
-                    ),
-                  ),
-                  minLines: 1,
-                  maxLines: null,
-                  keyboardType: TextInputType.multiline,
-                  textCapitalization: TextCapitalization.sentences,
-                  onChanged: (v) {
-                    _rows[i].option.label = v;
-                    // Не трогаем value у «Другое» — его sentinel '_kOther'
-                    // нельзя перезаписывать.
-                    if (_rows[i].option.value != _kOther) {
-                      _rows[i].option.value = v;
-                    }
-                    widget.onChanged();
-                  },
-                  onSubmitted: (_) {
-                    widget.onChanged();
-                    _addOption();
-                  },
-                ),
+          child: TextField(
+            controller: _rows[i].controller,
+            focusNode: _rows[i].focus,
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'Вариант ${i + 1}',
+              filled: true,
+              fillColor: HseColors.surface,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(HseRadius.sm),
+                  borderSide: BorderSide.none),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(HseRadius.sm),
+                  borderSide: BorderSide.none),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(HseRadius.sm),
+                borderSide: const BorderSide(
+                    color: HseColors.primaryBright, width: 1.5),
+              ),
+            ),
+            // Авторастущее поле: длинные варианты ответа (типичные для
+            // вопросов про мотивы / описания) видно целиком.
+            minLines: 1,
+            maxLines: null,
+            keyboardType: TextInputType.multiline,
+            textCapitalization: TextCapitalization.sentences,
+            onChanged: (v) {
+              _rows[i].option.label = v;
+              _rows[i].option.value = v;
+              widget.onChanged();
+            },
+            onSubmitted: (_) {
+              widget.onChanged();
+              _addOption();
+            },
+          ),
         ),
         IconButton(
           icon: const Icon(Icons.close_rounded, size: 18),
           color: HseColors.muted,
-          tooltip: isOther ? 'Убрать вариант «Другое»' : 'Удалить вариант',
-          onPressed: () => _removeAt(i),
+          tooltip: 'Удалить вариант',
+          onPressed: _rows.length > 1 ? () => _removeAt(i) : null,
         ),
       ]),
     );
@@ -235,10 +775,6 @@ class _OptionsEditorState extends State<OptionsEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final supportsOther = widget.questionType == QuestionType.single_choice ||
-        widget.questionType == QuestionType.multiple_choice;
-    final hasOther = widget.options.any((o) => o.value == _kOther);
-
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Padding(
         padding: EdgeInsets.only(bottom: 8),
@@ -249,17 +785,20 @@ class _OptionsEditorState extends State<OptionsEditor> {
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.0)),
       ),
+      // ReorderableListView внутри другого Scrollable (ListView в
+      // builder_screen). Без shrinkWrap+NeverScrollableScrollPhysics
+      // получим бесконечную высоту и nested-scroll конфликт.
       ReorderableListView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        buildDefaultDragHandles: false,
+        buildDefaultDragHandles: false, // используем свой ReorderableDragStartListener
         itemCount: _rows.length,
         onReorder: _reorder,
+        // Дефолтный proxyDecorator оборачивает в Material с тенью — на
+        // нашем светлом фоне это «всплывает» аккуратно, оставляем.
         itemBuilder: (ctx, i) => _buildRow(i),
       ),
       const SizedBox(height: 4),
-
-      // Кнопка «+ Добавить вариант»
       Align(
         alignment: Alignment.centerLeft,
         child: TextButton.icon(
@@ -268,21 +807,6 @@ class _OptionsEditorState extends State<OptionsEditor> {
           onPressed: _addOption,
         ),
       ),
-
-      // Кнопка «+ Добавить вариант «Другое»» —
-      // только для single_choice / multiple_choice, только если её ещё нет
-      if (supportsOther && !hasOther)
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
-            label: const Text('Добавить вариант «Другое»'),
-            style: TextButton.styleFrom(
-              foregroundColor: HseColors.primaryBright,
-            ),
-            onPressed: _addOtherOption,
-          ),
-        ),
     ]);
   }
 }
