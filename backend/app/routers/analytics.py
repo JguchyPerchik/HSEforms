@@ -130,6 +130,45 @@ async def survey_analytics(
     )
     total, completed = total_q.one()
 
+    # 2a. Времена прохождения — отдельный лёгкий запрос. Тащим только
+    #     started_at/submitted_at завершённых respond'ов. Делать через
+    #     основной запрос (п.3) нельзя: он джойнит по answers, и каждый
+    #     response повторился бы N раз = неправильное среднее.
+    timing_rows = await db.execute(
+        select(Response.started_at, Response.submitted_at).where(
+            Response.survey_id == survey_id,
+            Response.is_complete.is_(True),
+            Response.submitted_at.is_not(None),
+        )
+    )
+    durations: list[float] = []
+    for started_at, submitted_at in timing_rows.all():
+        delta = (submitted_at - started_at).total_seconds()
+        # Отрицательная разница — мусор/баг кеша часов. Игнорируем.
+        if delta < 0:
+            continue
+        durations.append(delta)
+
+    # Медиана — на всём массиве, она устойчива к выбросам.
+    # Среднее — с обрезкой выбросов > 4 ч, иначе один забытый таб
+    # ломает метрику. 4 ч выбраны эвристически: длиннее реального опроса,
+    # короче «оставил с утра, открыл вечером».
+    median_seconds: int | None = None
+    avg_seconds: int | None = None
+    if durations:
+        sorted_d = sorted(durations)
+        mid = len(sorted_d) // 2
+        median_val = (
+            sorted_d[mid]
+            if len(sorted_d) % 2 == 1
+            else (sorted_d[mid - 1] + sorted_d[mid]) / 2
+        )
+        median_seconds = int(round(median_val))
+
+        clean = [d for d in durations if d <= 4 * 3600]
+        if clean:
+            avg_seconds = int(round(sum(clean) / len(clean)))
+
     # 3. Single query: все ответы, JOIN'нутые с их response. К существующему
     #    набору (qid, value, variant_assignments) добавляем submitted_at +
     #    is_complete — нужны для построения временного тренда. Один трип
@@ -222,5 +261,7 @@ async def survey_analytics(
         survey_id=survey_id, total_responses=total or 0,
         completed_responses=completed or 0,
         trend_bin=bin_name,
+        median_completion_seconds=median_seconds,
+        avg_completion_seconds=avg_seconds,
         questions=stats,
     )

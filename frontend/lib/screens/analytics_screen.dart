@@ -109,13 +109,28 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     Card(
                       child: Padding(
                         padding: const EdgeInsets.all(16),
-                        child: Row(children: [
-                          _stat('Всего ответов',
-                              data!['total_responses'].toString()),
-                          const SizedBox(width: 32),
-                          _stat('Завершённых',
-                              data!['completed_responses'].toString()),
-                        ]),
+                        child: Wrap(
+                          spacing: 32,
+                          runSpacing: 16,
+                          children: [
+                            _stat('Всего ответов',
+                                data!['total_responses'].toString()),
+                            _stat('Завершённых',
+                                data!['completed_responses'].toString()),
+                            _stat(
+                              'Медианное время',
+                              _formatDuration(
+                                  data!['median_completion_seconds'] as int?),
+                              hint: 'Половина прошла быстрее, половина — дольше',
+                            ),
+                            _stat(
+                              'Среднее время',
+                              _formatDuration(
+                                  data!['avg_completion_seconds'] as int?),
+                              hint: 'Без респондентов, оставивших вкладку > 4ч',
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -124,14 +139,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         padding: const EdgeInsets.only(bottom: 12),
                         child: QuestionAnalyticsCard(
                           question: (q as Map).cast<String, dynamic>(),
-                          // trend_bin — шаг бакетов для тренда, общий
-                          // для всего опроса. Бэк выбирает авто по
-                          // разбросу submitted_at. Фолбэк на 'day' нужен
-                          // на случай, если фронт пересоберут с новым
-                          // кодом раньше, чем выкатят backend (старый
-                          // ответ не содержит этого поля).
-                          trendBin:
-                              (data!['trend_bin'] as String?) ?? 'day',
                         ),
                       ),
                   ],
@@ -139,11 +146,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
-  Widget _stat(String label, String value) =>
+  Widget _stat(String label, String value, {String? hint}) =>
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label,
-            style: const TextStyle(
-                fontFamily: 'HSESans', color: HseColors.muted, fontSize: 12)),
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(label,
+              style: const TextStyle(
+                  fontFamily: 'HSESans',
+                  color: HseColors.muted,
+                  fontSize: 12)),
+          // Tooltip с пояснением для не-очевидных метрик: «среднее /
+          // медианное время» обычным юзерам нужно объяснить, иначе они
+          // путают. Иконка ненавязчивая, серая, не претендует на внимание.
+          if (hint != null) ...[
+            const SizedBox(width: 4),
+            Tooltip(
+              message: hint,
+              child: const Icon(Icons.info_outline,
+                  size: 13, color: HseColors.muted),
+            ),
+          ],
+        ]),
         const SizedBox(height: 4),
         Text(value,
             style: const TextStyle(
@@ -152,6 +174,27 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 fontWeight: FontWeight.w700,
                 color: HseColors.primary)),
       ]);
+
+  /// Форматирует число секунд в человекочитаемый «5 мин 23 сек».
+  /// `null` → прочерк (метрики ещё нет, никто не завершил опрос).
+  /// Логика выбора единиц:
+  ///   < 60 сек         → «42 сек»
+  ///   < 60 мин         → «5 мин» или «5 мин 23 сек»
+  ///   ≥ 60 мин         → «1 ч 12 мин» или «1 ч»
+  /// Секунды после минут (для < 60 мин случая) показываем только если
+  /// они не нулевые — иначе «5 мин 0 сек» дёргает глаз.
+  String _formatDuration(int? seconds) {
+    if (seconds == null) return '—';
+    if (seconds < 60) return '$seconds сек';
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    if (m < 60) {
+      return s == 0 ? '$m мин' : '$m мин $s сек';
+    }
+    final h = m ~/ 60;
+    final mm = m % 60;
+    return mm == 0 ? '$h ч' : '$h ч $mm мин';
+  }
 
 }
 

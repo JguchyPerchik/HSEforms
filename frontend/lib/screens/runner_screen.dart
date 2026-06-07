@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
@@ -37,6 +38,19 @@ class _RunnerScreenState extends State<RunnerScreen> {
   /// тапа «Далее» получаешь пустой экран и «теряешь» новые вопросы выше.
   final ScrollController _scrollCtrl = ScrollController();
 
+  /// FocusNode на «якоре» новой страницы (hero-карточке с заголовком
+  /// опроса). После каждой смены страницы фокус принудительно уезжает
+  /// сюда — чтобы screen reader озвучил новый контекст с самого начала,
+  /// а не «висел» на кнопке «Далее», которую только что нажали.
+  final FocusNode _pageHeadingFocus =
+      FocusNode(debugLabel: 'runner-page-heading', skipTraversal: true);
+
+  /// GlobalKey'и на карточки вопросов в текущей странице. Заполняются
+  /// при build (см. `..` присвоение ниже). Нужны для прокрутки/фокусировки
+  /// на конкретный вопрос при ошибке валидации — без них пользователь
+  /// просто слышит «не заполнен вопрос X», но не знает, где он на экране.
+  final Map<int, GlobalKey> _questionCardKeys = {};
+
   /// Per-question variant assignment computed once per session.
   /// Value: -1 = skipped, 0 = original, 1..n = variant index (1-based; n = variants[n-1]).
   final Map<int, int> _variantAssignment = {};
@@ -53,21 +67,39 @@ class _RunnerScreenState extends State<RunnerScreen> {
   @override
   void dispose() {
     _scrollCtrl.dispose();
+    _pageHeadingFocus.dispose();
     super.dispose();
   }
 
-  /// Сменить страницу и проскроллить тело в начало. Скролл откладываем на
-  /// post-frame: в момент вызова контроллер ещё привязан к СТАРОМУ layout'у,
-  /// и animateTo(0) визуально просто «дёрнется» в той же позиции. После
-  /// build()'a controller уже видит новую высоту контента и доедет корректно.
+  /// Сменить страницу: перенести фокус, оповестить screen reader, прыгнуть
+  /// в начало контента. Все три действия — критичные для доступности:
+  ///
+  /// 1. setState + ValueKey('page-N') на контейнере вынуждает Flutter
+  ///    пересобрать semantic tree. Без этого NVDA продолжает листать
+  ///    виртуальный буфер прошлой страницы — типовой баг Flutter Web
+  ///    с screen reader'ом, поправляется только полным сбросом subtree.
+  /// 2. requestFocus на hero-карточке: курсор клавиатуры/screen reader'а
+  ///    уезжает в начало новой страницы вместо того, чтобы «висеть» на
+  ///    кнопке «Далее», которую только что нажали. Без этого слабовидящий
+  ///    юзер не находит новые вопросы без ручной навигации стрелками.
+  /// 3. jumpTo(0) (а не animateTo) — анимированный скролл размазывает
+  ///    картинку под экранной лупой и мешает определить, куда уехал
+  ///    контент. Мгновенный прыжок лучше воспринимается ассистивными
+  ///    технологиями. Для зрячих юзеров это тоже ок — переход страниц
+  ///    логически дискретен, плавная анимация тут не нужна.
+  /// 4. SemanticsService.announce — явное голосовое уведомление о смене
+  ///    страницы. Дублирует визуальную «Шаг 2 из 5», которой не видно
+  ///    глазами/экранным читалом без специальной навигации.
   void _goToPage(int newIndex) {
+    final totalPages = _pages().length;
     setState(() => pageIndex = newIndex);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollCtrl.hasClients) return;
-      _scrollCtrl.animateTo(
-        0,
-        duration: const Duration(milliseconds: 240),
-        curve: Curves.easeOutCubic,
+      if (!mounted) return;
+      if (_scrollCtrl.hasClients) _scrollCtrl.jumpTo(0);
+      _pageHeadingFocus.requestFocus();
+      SemanticsService.announce(
+        'Страница ${newIndex + 1} из $totalPages',
+        Directionality.of(context),
       );
     });
   }
@@ -172,8 +204,26 @@ class _RunnerScreenState extends State<RunnerScreen> {
       if (q.required) {
         final v = answers[q.id]?['value'];
         if (v == null || v == '' || (v is List && v.isEmpty)) {
+          // Тройной канал оповещения, чтобы баг-репорт «нажал Далее, ничего
+          // не происходит» больше не повторился:
+          //   • SnackBar — для зрячих
+          //   • SemanticsService.announce — для screen reader'ов
+          //   • ensureVisible на карточку вопроса — для всех (особенно
+          //     юзеров с экранной лупой: контент уезжает в зону внимания)
           ScaffoldMessenger.of(context)
               .showSnackBar(SnackBar(content: Text('Заполните: ${q.title}')));
+          SemanticsService.announce(
+            'Не заполнен обязательный вопрос: ${q.title}',
+            Directionality.of(context),
+          );
+          final keyCtx = _questionCardKeys[q.id]?.currentContext;
+          if (keyCtx != null) {
+            Scrollable.ensureVisible(
+              keyCtx,
+              duration: const Duration(milliseconds: 200),
+              alignment: 0.1, // карточка ~у верхнего края, не в самом центре
+            );
+          }
           return false;
         }
       }
@@ -394,6 +444,18 @@ class _RunnerScreenState extends State<RunnerScreen> {
             child: SingleChildScrollView(
               controller: _scrollCtrl,
               padding: const EdgeInsets.all(24),
+              // ValueKey по pageIndex + Semantics(liveRegion) — главный фикс
+              // для NVDA. KeyedSubtree заставляет Flutter полностью пересобрать
+              // semantic tree при смене страницы (старые DOM-узлы дисаются,
+               // новые монтируются), а liveRegion: true говорит NVDA
+               // обновить виртуальный буфер. Без этих двух флагов screen
+               // reader продолжает читать содержимое прошлой страницы.
+              child: KeyedSubtree(
+                key: ValueKey('runner-page-$pageIndex'),
+                child: Semantics(
+                container: true,
+                liveRegion: true,
+                label: 'Страница ${pageIndex + 1} из ${pages.length}',
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -409,7 +471,20 @@ class _RunnerScreenState extends State<RunnerScreen> {
                       _DraftBanner(status: s.status),
                       const SizedBox(height: 16),
                     ],
-                    Container(
+                    // Focus(focusNode: _pageHeadingFocus) — якорь для
+                    // requestFocus после смены страницы. Сам Focus невидим,
+                    // но получив фокус, поднимает событие в semantic tree:
+                    // screen reader зачитывает родительский Semantics-label
+                    // («Страница X из Y»), затем читает заголовок hero-карточки
+                    // как header. canRequestFocus=true делает узел
+                    // программно-фокусируемым, skipTraversal=true исключает
+                    // из обычного Tab-цикла (зрячий юзер по Tab не должен
+                    // прыгать на «пустой» якорь).
+                    Focus(
+                      focusNode: _pageHeadingFocus,
+                      canRequestFocus: true,
+                      skipTraversal: true,
+                      child: Container(
                       padding: const EdgeInsets.all(28),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -423,13 +498,15 @@ class _RunnerScreenState extends State<RunnerScreen> {
                       child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(s.title,
+                            Semantics(
+                              header: true,
+                              child: Text(s.title,
                                 style: const TextStyle(
                                     fontFamily: 'HSESans',
                                     color: Colors.white,
                                     fontSize: 28,
                                     fontWeight: FontWeight.w800,
-                                    height: 1.15)),
+                                    height: 1.15))),
                             if (s.description != null &&
                                 s.description!.isNotEmpty) ...[
                               const SizedBox(height: 8),
@@ -453,18 +530,37 @@ class _RunnerScreenState extends State<RunnerScreen> {
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              Text('Шаг ${pageIndex + 1} из ${pages.length}',
-                                  style: const TextStyle(
-                                      fontFamily: 'HSESans',
-                                      color: Colors.white70,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600)),
+                              Semantics(
+                                // Прогресс-бар сам по себе озвучивается как
+                                // «прогресс 0.6» — не информативно. Заворачиваем
+                                // и подпись «Шаг X из Y», и сам бар в один
+                                // semantic-узел с осмысленным label.
+                                label:
+                                    'Прогресс прохождения: шаг ${pageIndex + 1} из ${pages.length}',
+                                child: ExcludeSemantics(
+                                  child: Text(
+                                      'Шаг ${pageIndex + 1} из ${pages.length}',
+                                      style: const TextStyle(
+                                          fontFamily: 'HSESans',
+                                          color: Colors.white70,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600)),
+                                ),
+                              ),
                             ],
                           ]),
+                    ),
                     ),
                     const SizedBox(height: 16),
                     for (final q in page)
                       Padding(
+                        // GlobalKey нужен для Scrollable.ensureVisible в
+                        // _validatePage: при ошибке валидации мы скроллим
+                        // именно к проблемному вопросу + дёргаем screen
+                        // reader announce. Без ключа можно было бы только
+                        // верхний край контейнера тащить, без привязки к
+                        // конкретной карточке.
+                        key: _questionCardKeys.putIfAbsent(q.id, () => GlobalKey()),
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         child: Card(
                           child: Padding(
@@ -535,6 +631,8 @@ class _RunnerScreenState extends State<RunnerScreen> {
                         ),
                       ),
                   ]),
+                ),  // close Semantics(container,liveRegion)
+              ),  // close KeyedSubtree
             ),
           ),
         ),

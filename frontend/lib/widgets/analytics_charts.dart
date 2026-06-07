@@ -46,10 +46,50 @@ const List<Color> _palette = [
 
 Color _colorFor(int i) => _palette[i % _palette.length];
 
+// ─────────────────────── ось Y: «красивые» границы ──────────────────────
+
+/// Шаг делений по оси Y, подобранный «по-человечески». Без этой логики
+/// fl_chart при interval=null рендерит шкалу с дробными подписями
+/// (1.4, 2.8, 4.2…) — глаз цепляется и не считывает порядок величин.
+/// Привычные шаги: 1, 2, 5, 10, 20, 50, 100…
+double _niceStep(double maxV) {
+  if (maxV <= 5) return 1;
+  if (maxV <= 10) return 2;
+  if (maxV <= 50) return 5;
+  if (maxV <= 100) return 10;
+  if (maxV <= 500) return 50;
+  return (maxV / 5).roundToDouble();
+}
+
+/// Верхняя граница оси Y, выровненная по «красивому» шагу с гарантированным
+/// зазором СВЕРХУ. Без этого maxY = maxV * 1.1 даёт верхнюю гридлинию
+/// почти на кончике самого высокого столбика — подпись числа налазит на
+/// столбик, и весь чарт выглядит «упёртым в потолок».
+///
+/// Формула `(floor(maxV / step) + 1) * step` всегда добавляет ОДИН полный
+/// шаг воздуха над максимумом:
+///   maxV=7,  step=1   → 8   (gap = 1)
+///   maxV=10, step=2   → 12  (gap = 2)
+///   maxV=23, step=5   → 25  (gap = 2)
+///   maxV=7.3, step=1  → 8   (gap = 0.7)
+/// При maxV == 0 (нет данных) возвращаем 1 — иначе у fl_chart падает
+/// деление на ноль при расчёте делений.
+double _niceCeilY(double maxV) {
+  if (maxV <= 0) return 1;
+  final step = _niceStep(maxV);
+  return ((maxV / step).floor() + 1) * step;
+}
+
 // ─────────────────────────── enums типов графика ─────────────────────────
 
 enum _CatChart { bar, hbar, pie, donut, table }
-enum _NumChart { histogram, line, table }
+// `line` (тренд во времени) убран по дизайн-решению: для малой выборки
+// он выглядит как «график пульса», а данные тренда уже агрегированы и
+// не показывают распределение ответов. Заменён на `distribution` —
+// горизонтальная полоса с пропорциями ответов по значениям шкалы.
+// Backend всё ещё возвращает поля `trend`/`trend_bin`, оставлены для
+// возможного возврата фичи (или внешних API-консьюмеров).
+enum _NumChart { histogram, distribution, table }
 enum _TxtChart { samples, words }
 
 extension on _CatChart {
@@ -72,16 +112,12 @@ extension on _CatChart {
 extension on _NumChart {
   String get label => switch (this) {
         _NumChart.histogram => 'Гистограмма',
-        // Раньше «Линия» рисовала ту же гистограмму, только curve'нную —
-        // дублировала «Гистограмму». Теперь это полноценный временной
-        // тренд (среднее значение по бакетам времени), название поменяно
-        // соответственно.
-        _NumChart.line => 'Тренд',
+        _NumChart.distribution => 'Распределение',
         _NumChart.table => 'Таблица',
       };
   IconData get icon => switch (this) {
         _NumChart.histogram => Icons.bar_chart,
-        _NumChart.line => Icons.timeline_rounded,
+        _NumChart.distribution => Icons.view_week_outlined,
         _NumChart.table => Icons.table_rows_outlined,
       };
 }
@@ -101,15 +137,9 @@ extension on _TxtChart {
 
 class QuestionAnalyticsCard extends StatefulWidget {
   final Map<String, dynamic> question; // raw item из /analytics
-  /// Шаг временного тренда («5min» | «hour» | «day» | «week»). Авто-выбран
-  /// на бэкенде по разбросу submitted_at — общий для всего опроса,
-  /// потому что иначе нельзя сравнивать тренды разных вопросов. Если
-  /// поле отсутствует (старый ответ API), упадём на 'day' по умолчанию.
-  final String trendBin;
   const QuestionAnalyticsCard({
     super.key,
     required this.question,
-    this.trendBin = 'day',
   });
 
   @override
@@ -259,12 +289,17 @@ class _QuestionAnalyticsCardState extends State<QuestionAnalyticsCard> {
       switch (_num) {
         case _NumChart.histogram:
           return _NumericBars(hist: hist);
-        case _NumChart.line:
-          // Тренд берётся НЕ из distribution (там агрегат без времени),
-          // а из question.trend — список TrendPoint'ов, посчитанный на
-          // бэкенде по submitted_at.
-          final trend = (widget.question['trend'] as List?) ?? const [];
-          return _NumericLine(trend: trend, binName: widget.trendBin);
+        case _NumChart.distribution:
+          // Горизонтальная полоса с пропорциями ответов по значениям шкалы
+          // + маркеры среднего и медианы. Среднее уже посчитано на бэке
+          // (`dist['avg']`), медиану дёргаем из _NumStats — она реконструирует
+          // выборку из histogram'а, точно для целочисленных шкал.
+          final stats = _NumStats.from(dist);
+          return _NumericDistributionStrip(
+            hist: hist,
+            mean: (dist['avg'] as num?)?.toDouble(),
+            median: stats.n > 0 ? stats.median : null,
+          );
         case _NumChart.table:
           return _NumericTable(stats: _NumStats.from(dist), hist: hist);
       }
@@ -530,11 +565,16 @@ class _CategoricalBar extends StatelessWidget {
       );
     }
 
+    final niceMax = _niceCeilY(maxV);
+    final step = _niceStep(maxV);
     return SizedBox(
       height: (entries.length * 36 + 60).clamp(160, 320).toDouble(),
       child: BarChart(BarChartData(
         alignment: BarChartAlignment.spaceAround,
-        maxY: maxV * 1.1, // запас сверху, чтобы лейблы не липли к крышке
+        // niceMax даёт целый шаг воздуха над самым высоким столбиком,
+        // и сама верхняя гридлиния стоит на круглом числе. Без этого
+        // верхняя подпись числа налазила на кончик столбика.
+        maxY: niceMax,
         barTouchData: BarTouchData(enabled: true),
         gridData: const FlGridData(show: false),
         borderData: FlBorderData(show: false),
@@ -543,7 +583,7 @@ class _CategoricalBar extends StatelessWidget {
             sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 36,
-                interval: _niceStep(maxV),
+                interval: step,
                 getTitlesWidget: (v, _) {
                   if (v != v.roundToDouble()) return const SizedBox();
                   return Text(v.toInt().toString(),
@@ -592,18 +632,6 @@ class _CategoricalBar extends StatelessWidget {
         ],
       )),
     );
-  }
-
-  // Грубо подбирает шаг для оси Y, чтобы лейблы не сливались (1, 2, 5, 10,
-  // 20, 50, ...). Без этого fl_chart с дробным interval рендерит ось каждые
-  // 0.x — рябит в глазах.
-  static double _niceStep(double maxV) {
-    if (maxV <= 5) return 1;
-    if (maxV <= 10) return 2;
-    if (maxV <= 50) return 5;
-    if (maxV <= 100) return 10;
-    if (maxV <= 500) return 50;
-    return (maxV / 5).roundToDouble();
   }
 }
 
@@ -785,14 +813,21 @@ class _NumericBars extends StatelessWidget {
       ..sort((a, b) => int.parse(a.key.toString())
           .compareTo(int.parse(b.key.toString())));
     if (entries.isEmpty) return const SizedBox.shrink();
-    final maxV =
-        entries.fold<num>(0, (m, e) => (e.value as num) > m ? e.value : m).toDouble();
+    final maxV = entries
+        .fold<num>(0, (m, e) => (e.value as num) > m ? e.value : m)
+        .toDouble();
+    final niceMax = _niceCeilY(maxV);
+    final step = _niceStep(maxV);
 
     return SizedBox(
       height: 200,
       child: BarChart(BarChartData(
         alignment: BarChartAlignment.spaceAround,
-        maxY: maxV * 1.1,
+        // niceMax + явный interval = верхняя гридлиния стоит на круглом
+        // числе с гарантированным зазором над максимальным столбиком.
+        // Раньше maxV*1.1 + auto-interval давали или дробные подписи
+        // («1.4», «2.8»), или верхнюю подпись прямо на крыше столбика.
+        maxY: niceMax,
         barGroups: [
           for (final e in entries)
             BarChartGroupData(x: int.parse(e.key.toString()), barRods: [
@@ -805,13 +840,49 @@ class _NumericBars extends StatelessWidget {
               ),
             ]),
         ],
-        titlesData: const FlTitlesData(
+        titlesData: FlTitlesData(
           leftTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: true, reservedSize: 32)),
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 32,
+              interval: step,
+              // Y — это число респондентов (count), всегда целое.
+              // Скрываем любые дробные подписи на случай, если fl_chart
+              // сгенерировал промежуточное деление между нашими.
+              getTitlesWidget: (v, _) {
+                if (v != v.roundToDouble()) return const SizedBox();
+                return Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Text(v.toInt().toString(),
+                      style: const TextStyle(
+                          fontFamily: 'HSESans', fontSize: 11)),
+                );
+              },
+            ),
+          ),
           bottomTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: true, reservedSize: 24)),
-          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 24,
+              // X — это значения шкалы (1, 2, 3, …), всегда целые.
+              // interval=1 заставляет fl_chart подписать каждое деление,
+              // иначе для шкал 1..10 он мог бы пропустить промежуточные.
+              interval: 1,
+              getTitlesWidget: (v, _) {
+                if (v != v.roundToDouble()) return const SizedBox();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(v.toInt().toString(),
+                      style: const TextStyle(
+                          fontFamily: 'HSESans', fontSize: 11)),
+                );
+              },
+            ),
+          ),
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
         gridData: const FlGridData(show: false),
         borderData: FlBorderData(show: false),
@@ -820,190 +891,32 @@ class _NumericBars extends StatelessWidget {
   }
 }
 
-/// Временной тренд средних значений ответа.
+/// Распределение ответов на scale-вопрос в виде горизонтальной
+/// proportional-полосы. Альтернатива гистограмме: тот же массив
+/// `dist['histogram']`, но визуально подчёркнуты ДОЛИ, а не абсолютные
+/// числа. Полоса всегда полная — даже на маленькой выборке выглядит
+/// цельно, а не как «три столбика на пустом холсте».
 ///
-/// Получает массив `trend` из бэкенда (см. TrendPoint в schemas/analytics.py):
-/// каждая точка — {bucket: ISO datetime, mean: double, n: int}. Шаг бакета
-/// (5min/hour/day/week) определяется на бэке по разбросу submitted_at и
-/// передаётся в [binName] — нужен, чтобы выбрать формат подписи на оси X.
+/// Дополнительно сверху рисуем маркер среднего (сплошной треугольник)
+/// и медианы (полый треугольник) — пользователь сразу видит, где
+/// центральная тенденция распределения, и насколько mean расходится с
+/// median (признак скошенности — длинный «хвост» в одну сторону).
 ///
-/// Логика подписей:
-///   • 5min/hour → «HH:MM» (или «DD.MM HH:MM» если бакеты охватывают
-///                  больше одного дня — это не должно случаться при таком
-///                  биннинге, но защита есть)
-///   • day        → «DD.MM»
-///   • week       → «DD.MM» начала недели (понедельник)
-///
-/// На вход timestamp прилетает в UTC (с суффиксом Z или +00:00). Парсим
-/// его как UTC и конвертим в local — пользователь хочет видеть «своё»
-/// время, а не серверное.
-class _NumericLine extends StatelessWidget {
-  final List trend;       // List<Map> от backend'а
-  final String binName;   // '5min' | 'hour' | 'day' | 'week'
-  const _NumericLine({required this.trend, required this.binName});
+/// Цвет сегментов — HseColors.primary с возрастающей opacity слева
+/// направо. Это передаёт ординальность шкалы визуально: левые значения
+/// бледнее, правые насыщеннее. Без привязки к полярности «хорошо/плохо»
+/// (не у всех scale-вопросов высокие значения — это «хорошо», например,
+/// «оцените сложность от 1 до 5»).
+class _NumericDistributionStrip extends StatelessWidget {
+  final Map hist;
+  final double? mean;
+  final double? median;
+  const _NumericDistributionStrip({
+    required this.hist,
+    required this.mean,
+    required this.median,
+  });
 
-  /// Парсит ISO-строку из backend'а как UTC, возвращает local DateTime.
-  /// Backend форматирует через .isoformat() с tz-info, так что Dart
-  /// сразу выдаёт правильный UTC. Конвертация в local — для отображения.
-  DateTime _parse(String iso) => DateTime.parse(iso).toLocal();
-
-  /// Подпись на оси X для конкретной даты в зависимости от шага бакета.
-  String _label(DateTime t) {
-    String two(int n) => n.toString().padLeft(2, '0');
-    switch (binName) {
-      case '5min':
-      case 'hour':
-        return '${two(t.hour)}:${two(t.minute)}';
-      case 'week':
-      case 'day':
-      default:
-        return '${two(t.day)}.${two(t.month)}';
-    }
-  }
-
-  /// Подпись в тултипе — более развёрнутая, чтобы пользователь видел
-  /// полный контекст: дата + время для under-day бакетов, только дата
-  /// для дневных/недельных.
-  String _tooltipLabel(DateTime t) {
-    String two(int n) => n.toString().padLeft(2, '0');
-    final date = '${two(t.day)}.${two(t.month)}.${t.year}';
-    if (binName == '5min' || binName == 'hour') {
-      return '$date ${two(t.hour)}:${two(t.minute)}';
-    }
-    if (binName == 'week') {
-      // Конец недели = начало + 6 дней
-      final end = t.add(const Duration(days: 6));
-      return '$date – ${two(end.day)}.${two(end.month)}';
-    }
-    return date;
-  }
-
-  String get _binHuman => switch (binName) {
-        '5min' => 'по 5 мин',
-        'hour' => 'по часу',
-        'week' => 'по неделям',
-        _ => 'по дням',
-      };
-
-  @override
-  Widget build(BuildContext context) {
-    if (trend.isEmpty) {
-      return _emptyHint(
-          'Тренд считается по завершённым ответам с известным временем '
-          'отправки. Пока таких ответов нет.');
-    }
-    if (trend.length < 2) {
-      return _emptyHint(
-          'Для тренда нужно хотя бы 2 точки во времени. '
-          'Текущий шаг бакета — $_binHuman. '
-          'Когда соберётся больше ответов, график появится автоматически.');
-    }
-
-    // Преобразуем trend в спарсенные точки. X — порядковый индекс
-    // бакета (0..N-1): так fl_chart рисует ровные интервалы по оси,
-    // а пробелы во времени мы показываем подписями. Альтернатива —
-    // X = millisecondsSinceEpoch, но тогда между «нет данных» бакетами
-    // получится пустота, что иногда хуже читается.
-    final times = <DateTime>[];
-    final spots = <FlSpot>[];
-    for (int i = 0; i < trend.length; i++) {
-      final p = trend[i] as Map;
-      times.add(_parse(p['bucket'] as String));
-      spots.add(FlSpot(i.toDouble(), (p['mean'] as num).toDouble()));
-    }
-
-    final yMax = spots.fold<double>(spots.first.y, (m, s) => s.y > m ? s.y : m);
-    final yMin = spots.fold<double>(spots.first.y, (m, s) => s.y < m ? s.y : m);
-    final yPad = (yMax - yMin) * 0.1;
-    // Подбираем шаг подписей на X, чтобы не было сплошной каши на
-    // длинных рядах: показываем ~6 подписей всего.
-    final xLabelStep = (trend.length / 6).ceil().clamp(1, trend.length);
-
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(
-        padding: const EdgeInsets.only(bottom: 8, left: 4),
-        child: Text(
-          'Среднее значение по времени · бакет $_binHuman · только завершённые',
-          style: const TextStyle(
-              fontFamily: 'HSESans',
-              fontSize: 11,
-              color: HseColors.muted),
-        ),
-      ),
-      SizedBox(
-        height: 220,
-        child: LineChart(LineChartData(
-          minY: yMin - yPad,
-          maxY: yMax + yPad,
-          lineBarsData: [
-            LineChartBarData(
-              spots: spots,
-              isCurved: true,
-              curveSmoothness: 0.2,
-              color: HseColors.primary,
-              barWidth: 3,
-              dotData: const FlDotData(show: true),
-              belowBarData: BarAreaData(
-                show: true,
-                color: HseColors.primary.withOpacity(0.12),
-              ),
-            ),
-          ],
-          lineTouchData: LineTouchData(
-            touchTooltipData: LineTouchTooltipData(
-              getTooltipItems: (touched) => touched.map((s) {
-                final i = s.x.toInt();
-                if (i < 0 || i >= trend.length) return null;
-                final p = trend[i] as Map;
-                return LineTooltipItem(
-                  '${_tooltipLabel(times[i])}\n'
-                  'M = ${(p['mean'] as num).toStringAsFixed(2)} · N = ${p['n']}',
-                  const TextStyle(
-                      color: Colors.white,
-                      fontFamily: 'HSESans',
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600),
-                );
-              }).toList(),
-            ),
-          ),
-          titlesData: FlTitlesData(
-            leftTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: true, reservedSize: 36)),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 28,
-                interval: xLabelStep.toDouble(),
-                getTitlesWidget: (v, _) {
-                  final i = v.toInt();
-                  if (i < 0 || i >= times.length) return const SizedBox();
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(_label(times[i]),
-                        style: const TextStyle(
-                            fontFamily: 'HSESans', fontSize: 10)),
-                  );
-                },
-              ),
-            ),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          ),
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            getDrawingHorizontalLine: (_) =>
-                const FlLine(color: HseColors.border, strokeWidth: 0.5),
-          ),
-          borderData: FlBorderData(show: false),
-        )),
-      ),
-    ]);
-  }
-
-  /// Серая «нет данных»-плашка вместо графика — для случаев, когда тренд
-  /// нельзя построить (0 или 1 точка во времени).
   Widget _emptyHint(String text) {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1012,7 +925,7 @@ class _NumericLine extends StatelessWidget {
         borderRadius: BorderRadius.circular(HseRadius.md),
       ),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Icon(Icons.timeline_rounded,
+        const Icon(Icons.view_week_outlined,
             size: 18, color: HseColors.muted),
         const SizedBox(width: 10),
         Expanded(
@@ -1026,7 +939,254 @@ class _NumericLine extends StatelessWidget {
       ]),
     );
   }
+
+  /// Доля (0..1) позиции значения [v] на оси шкалы от [minV] до [maxV].
+  /// При совпадении границ возвращает 0.5 — маркер встаёт по центру, что
+  /// логично «единственное значение = всё распределение тут».
+  double _fractionOf(double v, int minV, int maxV) {
+    if (maxV == minV) return 0.5;
+    return ((v - minV) / (maxV - minV)).clamp(0.0, 1.0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Парсим и сортируем по int-ключу. Если histogram пустой или сумма
+    // нулевая — респондентов нет, рисуем заглушку.
+    final entries = hist.entries.toList()
+      ..sort((a, b) => int.parse(a.key.toString())
+          .compareTo(int.parse(b.key.toString())));
+    if (entries.isEmpty) {
+      return _emptyHint('Распределение появится, когда придёт первый ответ.');
+    }
+    final total = entries.fold<int>(
+        0, (a, e) => a + (e.value as num).toInt());
+    if (total == 0) {
+      return _emptyHint('Распределение появится, когда придёт первый ответ.');
+    }
+
+    final minVal = int.parse(entries.first.key.toString());
+    final maxVal = int.parse(entries.last.key.toString());
+    final n = entries.length;
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      // Маркеры центральной тенденции. Считаем позиции относительно
+      // ширины полосы; используем LayoutBuilder, чтобы взять реальную
+      // ширину после layout'a (Align/Alignment не подходит — он
+      // позиционирует center child, а нам нужен контроль над сдвигом
+      // относительно сегмента, который шириной flex≠const).
+      SizedBox(
+        height: 36,
+        child: LayoutBuilder(builder: (ctx, constraints) {
+          final w = constraints.maxWidth;
+          final markers = <Widget>[];
+          if (mean != null) {
+            final pos = _fractionOf(mean!, minVal, maxVal) * w;
+            markers.add(_MeanMarker(
+              left: pos,
+              label: 'M = ${mean!.toStringAsFixed(2)}',
+              filled: true,
+            ));
+          }
+          // Медиану рисуем только если она заметно отличается от среднего —
+          // иначе бэйджи наезжают и читаются как «MM=3.40 3.50» кашей.
+          if (median != null &&
+              (mean == null || (median! - mean!).abs() > 0.05)) {
+            final pos = _fractionOf(median!, minVal, maxVal) * w;
+            markers.add(_MeanMarker(
+              left: pos,
+              label: 'Mdn = ${median! == median!.roundToDouble() ? median!.toInt() : median!.toStringAsFixed(2)}',
+              filled: false,
+            ));
+          }
+          return Stack(clipBehavior: Clip.none, children: markers);
+        }),
+      ),
+      // Сама полоса. ClipRRect, чтобы внутренние сегменты не торчали
+      // за скруглённые углы. Минимальная высота 56px — иначе подписи
+      // «%» и «значение» не помещаются в две строки.
+      ClipRRect(
+        borderRadius: BorderRadius.circular(HseRadius.sm),
+        child: Container(
+          height: 56,
+          decoration: BoxDecoration(
+            border: Border.all(color: HseColors.border, width: 1),
+            borderRadius: BorderRadius.circular(HseRadius.sm),
+          ),
+          child: Row(children: [
+            for (int i = 0; i < n; i++)
+              Expanded(
+                // flex по числу ответов = ширина сегмента пропорциональна
+                // доле. Для нулей это даст flex=0 — сегмент схлопнется,
+                // но у нас в entries только значения с count > 0, так что
+                // нулей тут не бывает (в histogram бэкенда мы пишем только
+                // ненулевые бакеты).
+                flex: (entries[i].value as num).toInt(),
+                child: _StripCell(
+                  value: entries[i].key.toString(),
+                  count: (entries[i].value as num).toInt(),
+                  total: total,
+                  index: i,
+                  lastIndex: n - 1,
+                  showRightDivider: i < n - 1,
+                ),
+              ),
+          ]),
+        ),
+      ),
+      const SizedBox(height: 8),
+      // Подпись-легенда снизу. Текст «N=… · от … до …» помогает быстро
+      // увидеть размер выборки и диапазон значений (на самой полосе
+      // диапазон неявный — края не подписаны явно, чтобы не загромождать).
+      Row(children: [
+        Text('N = $total',
+            style: const TextStyle(
+                fontFamily: 'HSESans',
+                fontSize: 11,
+                color: HseColors.muted,
+                fontWeight: FontWeight.w600)),
+        const SizedBox(width: 12),
+        Text('диапазон шкалы: $minVal–$maxVal',
+            style: const TextStyle(
+                fontFamily: 'HSESans',
+                fontSize: 11,
+                color: HseColors.muted)),
+      ]),
+    ]);
+  }
 }
+
+/// Маленький треугольный маркер над полосой распределения с подписью.
+/// filled=true → сплошной (среднее), filled=false → полый (медиана).
+/// Позиционируется по pixel'у [left], сам себя центрирует относительно
+/// этой точки через FractionalTranslation.
+class _MeanMarker extends StatelessWidget {
+  final double left;
+  final String label;
+  final bool filled;
+  const _MeanMarker({
+    required this.left,
+    required this.label,
+    required this.filled,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = filled ? HseColors.primary : HseColors.primaryBright;
+    return Positioned(
+      left: left,
+      top: 0,
+      child: FractionalTranslation(
+        // Сдвигаем виджет влево на половину своей ширины, чтобы центр
+        // лежал ровно на [left] (а не левый край). FractionalTranslation
+        // работает с размером самого виджета, не родителя.
+        translation: const Offset(-0.5, 0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: filled ? color : Colors.white,
+                border: Border.all(color: color, width: 1.2),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'HSESans',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: filled ? Colors.white : color,
+                ),
+              ),
+            ),
+            // Тонкая «иголка» от бейджа до верхнего края полосы — связывает
+            // подпись с точкой на шкале. Без неё непонятно, к чему именно
+            // относится M=3.36.
+            Container(width: 1.5, height: 6, color: color),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Одна ячейка полосы — конкретное значение шкалы с его долей.
+/// Цвет на градиенте primary 0.35→0.95 по индексу — передаёт ординальность
+/// шкалы (слева бледно, справа насыщенно). Внутри подпись «%» крупно
+/// и значение шкалы мельче снизу.
+class _StripCell extends StatelessWidget {
+  final String value;
+  final int count;
+  final int total;
+  final int index;
+  final int lastIndex;
+  final bool showRightDivider;
+  const _StripCell({
+    required this.value,
+    required this.count,
+    required this.total,
+    required this.index,
+    required this.lastIndex,
+    required this.showRightDivider,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = count / total * 100;
+    final opacity =
+        lastIndex == 0 ? 0.65 : (0.35 + 0.6 * (index / lastIndex));
+    final pctStr = pct >= 10 ? pct.toStringAsFixed(0) : pct.toStringAsFixed(1);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: HseColors.primary.withOpacity(opacity),
+        border: showRightDivider
+            ? const Border(right: BorderSide(color: Colors.white, width: 1))
+            : null,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: FittedBox(
+          // FittedBox ужмёт текст, если сегмент слишком узкий (например,
+          // одно из значений дало 2% от выборки — обычная читаемая строка
+          // не поместится).
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                '$pctStr%',
+                style: const TextStyle(
+                  fontFamily: 'HSESans',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  height: 1.0,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  fontFamily: 'HSESans',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withOpacity(0.85),
+                  height: 1.0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// (старый _NumericLine удалён, заменён на _NumericDistributionStrip выше)
 
 class _NumericTable extends StatelessWidget {
   final _NumStats stats;
