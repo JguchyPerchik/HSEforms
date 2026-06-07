@@ -7,7 +7,11 @@ class QuestionRenderer extends StatelessWidget {
   final Question question;
   final Map<String, dynamic>? value;
   final ValueChanged<Map<String, dynamic>> onChanged;
-  const QuestionRenderer({super.key, required this.question, required this.value, required this.onChanged});
+  const QuestionRenderer(
+      {super.key,
+      required this.question,
+      required this.value,
+      required this.onChanged});
 
   void _set(dynamic v) => onChanged({'value': v});
 
@@ -17,7 +21,8 @@ class QuestionRenderer extends StatelessWidget {
     final isHeader = q.type == QuestionType.section_header;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Expanded(child: Text(
+        Expanded(
+            child: Text(
           q.title.isEmpty ? '(без названия)' : q.title,
           style: TextStyle(
             fontSize: isHeader ? 20 : 16,
@@ -25,15 +30,22 @@ class QuestionRenderer extends StatelessWidget {
             color: isHeader ? HseColors.primary : Colors.black87,
           ),
         )),
-        if (q.required) const Padding(
-          padding: EdgeInsets.only(left: 6),
-          child: Text('*', style: TextStyle(color: HseColors.danger, fontSize: 18, fontWeight: FontWeight.w700)),
-        ),
+        if (q.required)
+          const Padding(
+            padding: EdgeInsets.only(left: 6),
+            child: Text('*',
+                style: TextStyle(
+                    color: HseColors.danger,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700)),
+          ),
       ]),
-      if (q.description != null && q.description!.isNotEmpty) Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Text(q.description!, style: const TextStyle(color: HseColors.muted, fontSize: 13)),
-      ),
+      if (q.description != null && q.description!.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(q.description!,
+              style: const TextStyle(color: HseColors.muted, fontSize: 13)),
+        ),
       const SizedBox(height: 12),
       _input(context, q),
     ]);
@@ -80,40 +92,49 @@ class QuestionRenderer extends StatelessWidget {
       //   );
       case QuestionType.single_choice:
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          for (final o in q.options) RadioListTile<String>(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            value: o.value, groupValue: v?.toString(),
-            activeColor: HseColors.primary,
-            title: Text(o.label),
-            onChanged: (val) => _set(val),
-          ),
+          for (final o in q.options)
+            RadioListTile<String>(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              value: o.value,
+              groupValue: v?.toString(),
+              activeColor: HseColors.primary,
+              title: Text(o.label),
+              onChanged: (val) => _set(val),
+            ),
         ]);
       case QuestionType.dropdown:
         return DropdownButtonFormField<String>(
           value: v?.toString(),
           isExpanded: true,
           decoration: const InputDecoration(hintText: 'Выберите…'),
-          items: q.options.map((o) => DropdownMenuItem(value: o.value, child: Text(o.label))).toList(),
+          items: q.options
+              .map(
+                  (o) => DropdownMenuItem(value: o.value, child: Text(o.label)))
+              .toList(),
           onChanged: (val) => _set(val),
         );
       case QuestionType.multiple_choice:
         final cur = (v as List?)?.cast<String>() ?? <String>[];
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          for (final o in q.options) CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            controlAffinity: ListTileControlAffinity.leading,
-            value: cur.contains(o.value),
-            activeColor: HseColors.primary,
-            title: Text(o.label),
-            onChanged: (sel) {
-              final next = List<String>.from(cur);
-              if (sel == true) { if (!next.contains(o.value)) next.add(o.value); }
-              else { next.remove(o.value); }
-              _set(next);
-            },
-          ),
+          for (final o in q.options)
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              controlAffinity: ListTileControlAffinity.leading,
+              value: cur.contains(o.value),
+              activeColor: HseColors.primary,
+              title: Text(o.label),
+              onChanged: (sel) {
+                final next = List<String>.from(cur);
+                if (sel == true) {
+                  if (!next.contains(o.value)) next.add(o.value);
+                } else {
+                  next.remove(o.value);
+                }
+                _set(next);
+              },
+            ),
         ]);
       case QuestionType.scale:
         final mnRaw = q.config['min'];
@@ -127,25 +148,41 @@ class QuestionRenderer extends StatelessWidget {
         final cur = (v is num) ? v.toDouble() : mn.toDouble();
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            if (showBounds) Text('$mn', style: const TextStyle(color: HseColors.muted, fontWeight: FontWeight.w600)),
-            Expanded(child: Slider(
+            if (showBounds)
+              Text('$mn',
+                  style: const TextStyle(
+                      color: HseColors.muted, fontWeight: FontWeight.w600)),
+            Expanded(
+                child: Slider(
               value: cur.clamp(mn.toDouble(), mx.toDouble()),
-              min: mn.toDouble(), max: mx.toDouble(),
+              min: mn.toDouble(),
+              max: mx.toDouble(),
               divisions: showTicks ? (mx - mn) : null,
               label: showValue ? cur.toInt().toString() : null,
               activeColor: HseColors.primary,
+              onChangeStart: (d) => _set(d.toInt()),
               onChanged: (d) => _set(d.toInt()),
             )),
-            if (showBounds) Text('$mx', style: const TextStyle(color: HseColors.muted, fontWeight: FontWeight.w600)),
+            if (showBounds)
+              Text('$mx',
+                  style: const TextStyle(
+                      color: HseColors.muted, fontWeight: FontWeight.w600)),
           ]),
-          if (showValue && v != null) Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(color: HseColors.surfaceAlt, borderRadius: BorderRadius.circular(999)),
-              child: Text('${(v as num).toInt()}',
-                  style: const TextStyle(fontWeight: FontWeight.w700, color: HseColors.primary, fontSize: 16)),
+          if (showValue && v != null)
+            Center(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                    color: HseColors.surfaceAlt,
+                    borderRadius: BorderRadius.circular(999)),
+                child: Text('${(v as num).toInt()}',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: HseColors.primary,
+                        fontSize: 16)),
+              ),
             ),
-          ),
         ]);
       // case QuestionType.rating:
       //   final cur = (v is num) ? v.toInt() : 0;
