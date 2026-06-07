@@ -438,12 +438,20 @@ class _RunnerScreenState extends State<RunnerScreen> {
       appBar: _previewAppBar(),
       backgroundColor: _bg(s),
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: SingleChildScrollView(
-              controller: _scrollCtrl,
-              padding: const EdgeInsets.all(24),
+        // ScrollView НА УРОВНЕ всего viewport'а, а не внутри Center'a.
+        // Раньше структура была: Center > ConstrainedBox(720) > ScrollView
+        // — колесо мыши ловилось только в 720px-полосе посередине, по бокам
+        // (серые поля) скролл не работал. Теперь: ScrollView сначала
+        // занимает всю ширину, а уже внутри его child'a — Center
+        // + ConstrainedBox для ограничения ширины контента. Hit-region
+        // прокрутки = весь экран, ширина контента остаётся как была.
+        child: SingleChildScrollView(
+          controller: _scrollCtrl,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
               // ValueKey по pageIndex + Semantics(liveRegion) — главный фикс
               // для NVDA. KeyedSubtree заставляет Flutter полностью пересобрать
               // semantic tree при смене страницы (старые DOM-узлы дисаются,
@@ -633,10 +641,11 @@ class _RunnerScreenState extends State<RunnerScreen> {
                   ]),
                 ),  // close Semantics(container,liveRegion)
               ),  // close KeyedSubtree
-            ),
-          ),
-        ),
-      ),
+              ),  // close Padding (новый — был параметром SingleChildScrollView)
+            ),  // close ConstrainedBox
+          ),  // close Center
+        ),  // close SingleChildScrollView (вынесен наружу)
+      ),  // close SafeArea
     );
   }
 }
