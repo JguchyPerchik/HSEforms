@@ -29,6 +29,14 @@ class _RunnerScreenState extends State<RunnerScreen> {
   String? _error;
   final Map<int, Map<String, dynamic>> answers = {};
 
+  /// Контроллер прокрутки тела опроса. Нужен, чтобы при переходе «Далее»/
+  /// «Назад» сбрасывать положение скролла в начало новой страницы — иначе
+  /// SingleChildScrollView сохраняет позицию (пользователь нажал кнопку
+  /// внизу — там и остаётся, хотя контент уже другой). Особенно жёстко
+  /// это видно, если первая страница длинная, а вторая короткая: после
+  /// тапа «Далее» получаешь пустой экран и «теряешь» новые вопросы выше.
+  final ScrollController _scrollCtrl = ScrollController();
+
   /// Per-question variant assignment computed once per session.
   /// Value: -1 = skipped, 0 = original, 1..n = variant index (1-based; n = variants[n-1]).
   final Map<int, int> _variantAssignment = {};
@@ -40,6 +48,28 @@ class _RunnerScreenState extends State<RunnerScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Сменить страницу и проскроллить тело в начало. Скролл откладываем на
+  /// post-frame: в момент вызова контроллер ещё привязан к СТАРОМУ layout'у,
+  /// и animateTo(0) визуально просто «дёрнется» в той же позиции. После
+  /// build()'a controller уже видит новую высоту контента и доедет корректно.
+  void _goToPage(int newIndex) {
+    setState(() => pageIndex = newIndex);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollCtrl.hasClients) return;
+      _scrollCtrl.animateTo(
+        0,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   Future<void> _load() async {
@@ -233,8 +263,8 @@ class _RunnerScreenState extends State<RunnerScreen> {
   Widget build(BuildContext context) {
     if (_busy && survey == null) {
       return Scaffold(
-        appBar: _previewAppBar(),
-        body: const Center(child: CircularProgressIndicator()));
+          appBar: _previewAppBar(),
+          body: const Center(child: CircularProgressIndicator()));
     }
     if (_error != null) return Scaffold(body: Center(child: Text(_error!)));
     if (survey == null) {
@@ -249,32 +279,87 @@ class _RunnerScreenState extends State<RunnerScreen> {
       return Scaffold(
         appBar: _previewAppBar(),
         backgroundColor: _bg(s),
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(40),
+        // Оборачиваем в SingleChildScrollView: с добавлением CTA + feedback
+        // карточка может перерасти viewport на маленьких экранах. Без
+        // прокрутки получили бы RenderFlex overflow.
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: _primary(s).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(40),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: _primary(s).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Icon(Icons.check_circle_rounded,
+                              color: _primary(s), size: 56),
+                        ),
+                        const SizedBox(height: 18),
+                        Text('Спасибо!',
+                            style: Theme.of(context).textTheme.displayMedium),
+                        const SizedBox(height: 6),
+                        Text(
+                          _isPreview
+                              ? 'Предпросмотр завершён'
+                              : 'Ваш ответ записан',
+                          style: const TextStyle(
+                              fontFamily: 'HSESans',
+                              color: HseColors.muted,
+                              fontSize: 15),
+                          textAlign: TextAlign.center,
+                        ),
+                        // В preview-режиме CTA «Создать свой опрос» не
+                        // имеет смысла — пользователь и так владелец
+                        // платформы, у него есть верхняя иконка возврата
+                        // в редактор. Скрываем, чтобы не путать.
+                        if (!_isPreview) ...[
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () => context.go('/login'),
+                              icon: const Icon(Icons.add_circle_outline_rounded,
+                                  size: 18),
+                              label: const Text('Создай свой первый опрос!'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _primary(s),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 24, vertical: 18),
+                                textStyle: const TextStyle(
+                                  fontFamily: 'HSESans',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(HseRadius.sm),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          Text(
+                            'Ты прошел опрос на новой платформе HSEForms, '
+                            'если хочешь потыкать — регистрируйся ;)',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                fontFamily: 'HSESans',
+                                color: HseColors.muted,
+                                fontSize: 16,
+                                height: 1.35),
+                          ),
+                        ],
+                      ]),
                     ),
-                    child: Icon(Icons.check_circle_rounded,
-                        color: _primary(s), size: 56),
-                  ),
-                  const SizedBox(height: 18),
-                  Text('Спасибо!',
-                      style: Theme.of(context).textTheme.displayMedium),
-                  const SizedBox(height: 6),
-                  Text(
-                    _isPreview ? 'Предпросмотр завершён' : 'Ваш ответ записан',
-                    style: const TextStyle(
-                        fontFamily: 'HSESans',
-                        color: HseColors.muted,
-                        fontSize: 15),
                   ),
                 ]),
               ),
@@ -307,6 +392,7 @@ class _RunnerScreenState extends State<RunnerScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: SingleChildScrollView(
+              controller: _scrollCtrl,
               padding: const EdgeInsets.all(24),
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -399,7 +485,7 @@ class _RunnerScreenState extends State<RunnerScreen> {
                           icon: const Icon(Icons.arrow_back_rounded),
                           label: const Text('Назад',
                               style: TextStyle(fontFamily: 'HSESans')),
-                          onPressed: () => setState(() => pageIndex -= 1),
+                          onPressed: () => _goToPage(pageIndex - 1),
                         ),
                       const Spacer(),
                       ElevatedButton.icon(
@@ -419,7 +505,7 @@ class _RunnerScreenState extends State<RunnerScreen> {
                                 if (isLast) {
                                   _submit();
                                 } else {
-                                  setState(() => pageIndex += 1);
+                                  _goToPage(pageIndex + 1);
                                 }
                               },
                       ),
@@ -480,14 +566,16 @@ class _DraftBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0x1AE05656),
         borderRadius: BorderRadius.circular(HseRadius.md),
-        border: Border.all(color: HseColors.danger.withOpacity(0.35), width: 1.2),
+        border:
+            Border.all(color: HseColors.danger.withOpacity(0.35), width: 1.2),
       ),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Icon(Icons.lock_outline_rounded,
             color: HseColors.danger, size: 22),
         const SizedBox(width: 12),
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label,
                 style: const TextStyle(
                     fontFamily: 'HSESans',
