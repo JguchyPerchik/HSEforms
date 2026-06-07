@@ -47,13 +47,13 @@ class SurveySettingsPanel extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        _SectionHeader(text: 'ДОБАВИТЬ ВОПРОС'),
+        const _SectionHeader(text: 'ДОБАВИТЬ ВОПРОС'),
         const SizedBox(height: 10),
         Wrap(spacing: 8, runSpacing: 8, children: [
           for (final t in QuestionType.values) _QuestionTypeChip(type: t, onTap: () => onAddQuestion(t)),
         ]),
         const SizedBox(height: 28),
-        _SectionHeader(text: 'НАСТРОЙКИ ОПРОСА'),
+        const _SectionHeader(text: 'НАСТРОЙКИ ОПРОСА'),
         const SizedBox(height: 6),
         _Setting(
           title: 'Анонимный',
@@ -80,7 +80,7 @@ class SurveySettingsPanel extends StatelessWidget {
           onChanged: (v) => onSettingsChanged({'show_progress': v}),
         ),
         const SizedBox(height: 28),
-        _SectionHeader(text: 'A/B И ВИНЬЕТКИ'),
+        const _SectionHeader(text: 'A/B И ВИНЬЕТКИ'),
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.all(14),
@@ -88,16 +88,16 @@ class SurveySettingsPanel extends StatelessWidget {
             color: HseColors.surfaceAlt,
             borderRadius: BorderRadius.circular(HseRadius.md),
           ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Icon(Icons.shuffle_rounded, size: 18, color: HseColors.primaryBright),
-              const SizedBox(width: 8),
-              const Text('Как это работает', style: TextStyle(fontWeight: FontWeight.w700)),
+              SizedBox(width: 8),
+              Text('Как это работает', style: TextStyle(fontWeight: FontWeight.w700)),
             ]),
-            const SizedBox(height: 6),
-            const Text(
-              'Создайте 2+ вариантов опроса. Респондентам можно раздавать '
-              'их случайно (по весам) или строго по очереди — выберите ниже.',
+            SizedBox(height: 6),
+            Text(
+              'Создайте 2+ вариантов опроса. Выберите ниже, '
+              'как система будет их распределять: случайным образом (по весам) или по очереди',
               style: TextStyle(color: HseColors.inkSoft, fontSize: 13, height: 1.4),
             ),
           ]),
@@ -183,7 +183,7 @@ class SurveySettingsPanel extends StatelessWidget {
           )),
         ],
         const SizedBox(height: 28),
-        _SectionHeader(text: 'ССЫЛКА'),
+        const _SectionHeader(text: 'ССЫЛКА'),
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.all(12),
@@ -354,7 +354,7 @@ class _AssignmentModeSelector extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Раздача вариантов',
+            const Text('Распределение вариантов',
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
             const SizedBox(height: 8),
             // SegmentedButton + ширина 340px у боковой панели = переполнение.
@@ -363,8 +363,8 @@ class _AssignmentModeSelector extends StatelessWidget {
               selected: mode == 'random',
               icon: Icons.casino_outlined,
               title: 'Случайно (по весам)',
-              subtitle: 'Каждый респондент получает вариант случайно. Веса '
-                  'задают пропорцию на большой выборке.',
+              subtitle: 'Вариант опроса определяется случайным образом. '
+              'Заданные веса обеспечивают нужное процентное соотношение на больших выборках.',
               onTap: disabled ? null : () => onChanged('random'),
             ),
             const SizedBox(height: 6),
@@ -372,8 +372,8 @@ class _AssignmentModeSelector extends StatelessWidget {
               selected: isRR,
               icon: Icons.format_list_numbered_rounded,
               title: 'По очереди',
-              subtitle: 'Респонденты по очереди получают варианты в '
-                  'круг. Точное равное распределение на малой выборке.',
+              subtitle: 'Респонденты получают варианты последовательно по кругу. '
+              'Гарантирует строго равное разделение групп даже на малых выборках.',
               onTap: disabled ? null : () => onChanged('round_robin'),
             ),
             if (isRR && onReset != null && !disabled) ...[

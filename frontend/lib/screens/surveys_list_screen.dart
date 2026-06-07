@@ -132,7 +132,7 @@ class _SurveysListScreenState extends State<SurveysListScreen> {
                     Text(
                       list.isEmpty
                           ? 'Создайте свой первый опрос — это займёт пару минут.'
-                          : 'У вас ${list.length} опрос(ов). Соберите данные, проведите эксперимент, посмотрите аналитику.',
+                          : 'У вас ${list.length} опрос(ов). Запускайте исследования, собирайте ответы и изучайте аналитику.',
                       style: const TextStyle(
                           fontFamily: 'HSESans',
                           color: HseColors.inkSoft,
