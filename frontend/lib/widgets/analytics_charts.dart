@@ -613,8 +613,19 @@ class _CategoricalBar extends StatelessWidget {
               },
             ),
           ),
-          topTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          // ВАЖНО: пустой topTitles с reservedSize резервирует место
+          // НАД chart-area. Без этого верхний лейбл оси Y (на отметке maxY)
+          // рендерится центрированно по своей y-координате, и половина
+          // текста уезжает выше границы контейнера — клиппится визуально
+          // или налазит на соседние элементы. SideTitles с пустым
+          // getTitlesWidget = эффективный «top padding» fl_chart'а.
+          topTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 14,
+              getTitlesWidget: (_, __) => const SizedBox.shrink(),
+            ),
+          ),
           rightTitles:
               const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
@@ -879,8 +890,18 @@ class _NumericBars extends StatelessWidget {
               },
             ),
           ),
-          topTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          // Резерв 14px над chart-area, чтобы верхняя подпись Y (которая
+          // сидит на отметке maxY и центрируется по своей y-координате)
+          // не уезжала наверх за границу контейнера. Без этого ~половина
+          // текста «25» / «10» / «8» обрезается клиппингом или налазит
+          // на title карточки сверху. Аналогичный фикс — в _CategoricalBar.
+          topTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 14,
+              getTitlesWidget: (_, __) => const SizedBox.shrink(),
+            ),
+          ),
           rightTitles:
               const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
