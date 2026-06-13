@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'state/telegram_theme.dart';
+
 class HseColors {
   static const primary = Color(0xFF0F2D69);
   static const primaryBright = Color(0xFF234B9B);
@@ -43,19 +45,41 @@ class HseShadows {
 const String _bodyFont = 'HSESans';
 const String _displayFont = 'HSESans';
 
-ThemeData buildHseTheme() {
-  final scheme = const ColorScheme(
-    brightness: Brightness.light,
-    primary: HseColors.primary,
-    onPrimary: Colors.white,
+/// Собирает основную тему приложения. Если передан [tg] и он
+/// `available` (приложение реально открыто в Telegram Mini App), ключевые
+/// цвета — фон, основной текст, primary-акцент — берутся из палитры
+/// Telegram-клиента. Шрифты, типографика, скругления, тени остаются
+/// HSE-фирменными независимо от темы — иначе Mini App перестаёт быть
+/// узнаваемым продуктом ВШЭ.
+///
+/// За пределами Telegram (или если themeParams не пришли) — рендерим
+/// дефолтную светлую HSE-палитру, как раньше.
+ThemeData buildHseTheme([TelegramTheme? tg]) {
+  final useTg = tg != null && tg.available;
+  final isDark = useTg && tg.isDark;
+
+  // Резолвим ключевые цвета: Telegram переопределяет HSE-дефолты.
+  final bg = (useTg ? tg.bg : null) ?? HseColors.background;
+  final surface = (useTg ? tg.secondaryBg : null) ?? HseColors.surface;
+  final text = (useTg ? tg.text : null) ?? HseColors.ink;
+  final primary = (useTg ? tg.button : null) ?? HseColors.primary;
+  final onPrimary = (useTg ? tg.buttonText : null) ?? Colors.white;
+  // Hint-цвет Telegram'a используем для muted-текста, как чуть менее
+  // контрастного к background'у — это и есть его семантика в Telegram.
+  final muted = (useTg ? tg.hint : null) ?? HseColors.muted;
+
+  final scheme = ColorScheme(
+    brightness: isDark ? Brightness.dark : Brightness.light,
+    primary: primary,
+    onPrimary: onPrimary,
     secondary: HseColors.primaryBright,
     onSecondary: Colors.white,
-    surface: HseColors.background,
-    onSurface: HseColors.ink,
-    surfaceContainerHighest: HseColors.surface,
-    surfaceContainer: HseColors.surfaceAlt,
-    outline: HseColors.border,
-    outlineVariant: HseColors.border,
+    surface: bg,
+    onSurface: text,
+    surfaceContainerHighest: surface,
+    surfaceContainer: surface,
+    outline: muted,
+    outlineVariant: muted,
     error: HseColors.danger,
     onError: Colors.white,
   );

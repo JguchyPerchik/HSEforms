@@ -62,10 +62,47 @@
 <body>
   <script>
     window.tgInitData = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp.initData : "";
-    if (window.Telegram && window.Telegram.WebApp) {
-      try { window.Telegram.WebApp.ready(); window.Telegram.WebApp.expand(); } catch (e) { }
-    }
     window.apiBase = 'https://hseforms.ru/api';
+
+    // ─── Синхронизация темы Telegram → глобальный объект + событие ──────
+    //
+    // Mini App работает в WebView, унаследованном от темы клиента Telegram
+    // (светлая/тёмная). По умолчанию Flutter Web этого не знает и рисует
+    // приложение в своей фиксированной светлой теме — на тёмном Telegram
+    // выглядит чужеродно. Здесь:
+    //   1. Снимаем themeParams + colorScheme сразу при загрузке.
+    //   2. Подписываемся на событие themeChanged Telegram'a — оно
+    //      выстреливает, когда пользователь переключает тему клиента
+    //      не закрывая Mini App. Перечитываем и диспатчим свой
+    //      кастомный event 'tg-theme-changed' — его ловит Dart-сторона.
+    function syncTgTheme() {
+      var tg = window.Telegram && window.Telegram.WebApp;
+      if (!tg) { return; }
+      var p = tg.themeParams || {};
+      window.tgThemeParams = {
+        bg_color: p.bg_color || null,
+        text_color: p.text_color || null,
+        hint_color: p.hint_color || null,
+        link_color: p.link_color || null,
+        button_color: p.button_color || null,
+        button_text_color: p.button_text_color || null,
+        secondary_bg_color: p.secondary_bg_color || null,
+        header_bg_color: p.header_bg_color || null,
+        color_scheme: tg.colorScheme || 'light'
+      };
+      try {
+        window.dispatchEvent(new CustomEvent('tg-theme-changed'));
+      } catch (e) { /* old browsers — fallback не нужен */ }
+    }
+
+    if (window.Telegram && window.Telegram.WebApp) {
+      try {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+        syncTgTheme();
+        window.Telegram.WebApp.onEvent('themeChanged', syncTgTheme);
+      } catch (e) { }
+    }
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>

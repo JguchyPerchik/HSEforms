@@ -8,6 +8,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'theme.dart';
 import 'api/api_client.dart';
 import 'state/auth_state.dart';
+import 'state/telegram_theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/surveys_list_screen.dart';
 import 'screens/builder_screen.dart';
@@ -110,10 +111,20 @@ class _HseFormsAppState extends State<HseFormsApp> {
         Provider<ApiClient>.value(value: client),
         ChangeNotifierProvider<AuthState>.value(value: auth),
       ],
-      child: MaterialApp.router(
+      // Подписываемся на TelegramTheme: когда внутри Mini App пользователь
+      // переключит тёмную/светлую тему клиента — Telegram стрельнёт
+      // событием themeChanged, наш JS-listener в index.html обновит
+      // window.tgThemeParams и dispatchEvent'нет 'tg-theme-changed',
+      // TelegramTheme.instance это получит и вызовет notifyListeners() —
+      // что заставит ListenableBuilder перестроить весь MaterialApp с
+      // новой темой. Снаружи Telegram объект тоже создаётся, но
+      // available=false, и buildHseTheme(tg) откатывается на HSE-палитру.
+      child: ListenableBuilder(
+        listenable: TelegramTheme.instance,
+        builder: (context, _) => MaterialApp.router(
         title: 'HSE Forms',
         debugShowCheckedModeBanner: false,
-        theme: buildHseTheme(),
+        theme: buildHseTheme(TelegramTheme.instance),
         routerConfig: router,
         
         // 2. Вместо подмены MaterialApp используем билдер. 
@@ -132,6 +143,7 @@ class _HseFormsAppState extends State<HseFormsApp> {
           return child!;
         },
       ),
+      ),  // close ListenableBuilder
     );
   }
 }
