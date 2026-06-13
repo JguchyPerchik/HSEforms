@@ -20,9 +20,16 @@
 /// AnalyticsScreen означало бы Map<int, ChartType>, лишние setState на весь
 /// экран и сложное состояние во время скролла. Атомарная карточка — проще.
 import 'dart:math' as math;
+import 'dart:js_interop';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:fl_chart/fl_chart.dart';
+import 'package:web/web.dart' as web;
 
 import '../theme.dart';
 
@@ -151,6 +158,14 @@ class _QuestionAnalyticsCardState extends State<QuestionAnalyticsCard> {
   _NumChart _num = _NumChart.histogram;
   _TxtChart _txt = _TxtChart.samples;
 
+  /// Ключ на оборачивающий RepaintBoundary — нужен для «скачать как PNG».
+  /// Через него получаем RenderRepaintBoundary, который умеет дать
+  /// растровый снимок содержимого карточки (заголовок + статистика +
+  /// текущий выбранный график). Получается готовая картинка для вставки
+  /// в курсовую/отчёт — с уже отрисованными подписями и числами, ничего
+  /// дополнительно подписывать не нужно.
+  final GlobalKey _captureKey = GlobalKey();
+
   String _pluralAnswers(int n) {
     if (n % 100 >= 11 && n % 100 <= 19) return '$n ответов';
     return switch (n % 10) {
@@ -158,6 +173,173 @@ class _QuestionAnalyticsCardState extends State<QuestionAnalyticsCard> {
       2 || 3 || 4 => '$n ответа',
       _ => '$n ответов',
     };
+  }
+
+  /// Сборка текстового summary для копирования в буфер обмена.
+  /// Структура: заголовок → метаданные → ключевая статистика → распределение
+  /// или сэмплы (в зависимости от типа). Идея — чтобы пользователь мог
+  /// вставить результат напрямую в таблицу/курсовую без переоформления.
+  String _buildCopyText(String type, Map<String, dynamic> dist, int total) {
+    final q = widget.question;
+    final title = (q['title'] as String? ?? '').trim();
+    final buf = StringBuffer();
+    buf.writeln('Вопрос: $title');
+    buf.writeln('Тип: $type');
+    buf.writeln('Всего ответов: $total');
+    buf.writeln();
+
+    if (total == 0) {
+      buf.writeln('Данных пока нет.');
+      return buf.toString();
+    }
+
+    if (_isCat(type)) {
+      final s = _CatStats.from(dist);
+      buf.writeln('— Статистика —');
+      buf.writeln('Уникальных значений: ${s.unique}');
+      if (s.modeKey != null && s.total > 0) {
+        final pct = (s.modeCount / s.total * 100).toStringAsFixed(1);
+        buf.writeln('Мода: «${s.modeKey}» — ${s.modeCount} ($pct%)');
+      }
+      buf.writeln();
+      buf.writeln('— Распределение —');
+      final entries = dist.entries.toList()
+        ..sort((a, b) => (b.value as num).compareTo(a.value as num));
+      for (final e in entries) {
+        final n = (e.value as num).toInt();
+        final pct = s.total > 0 ? (n / s.total * 100).toStringAsFixed(1) : '0';
+        buf.writeln('  ${e.key}: $n ($pct%)');
+      }
+    } else if (_isNum(type)) {
+      final s = _NumStats.from(dist);
+      buf.writeln('— Описательная статистика —');
+      buf.writeln('N: ${s.n}');
+      buf.writeln('Среднее (M): ${s.mean.toStringAsFixed(2)}');
+      buf.writeln('Медиана (Mdn): ${_fmtNum(s.median)}');
+      buf.writeln('Стандартное отклонение (SD): ${s.std.toStringAsFixed(2)}');
+      buf.writeln('1-й квартиль (Q1): ${_fmtNum(s.q1)}');
+      buf.writeln('3-й квартиль (Q3): ${_fmtNum(s.q3)}');
+      buf.writeln('Межквартильный размах (IQR): ${_fmtNum(s.q3 - s.q1)}');
+      buf.writeln('Минимум: ${_fmtNum(s.min)}');
+      buf.writeln('Максимум: ${_fmtNum(s.max)}');
+      buf.writeln('Размах: ${_fmtNum(s.max - s.min)}');
+      final hist = (dist['histogram'] as Map?) ?? const {};
+      if (hist.isNotEmpty) {
+        buf.writeln();
+        buf.writeln('— Распределение по значениям —');
+        final entries = hist.entries.toList()
+          ..sort((a, b) => int.parse(a.key.toString())
+              .compareTo(int.parse(b.key.toString())));
+        final histTotal = entries.fold<int>(
+            0, (a, e) => a + (e.value as num).toInt());
+        for (final e in entries) {
+          final n = (e.value as num).toInt();
+          final pct = histTotal > 0
+              ? (n / histTotal * 100).toStringAsFixed(1)
+              : '0';
+          buf.writeln('  ${e.key}: $n ($pct%)');
+        }
+      }
+    } else {
+      // Текстовые вопросы — отдаём сэмплы целиком (без обрезок), пользователь
+      // сам решит, что вынести в курсовую.
+      final samples = (dist['sample'] as List?)?.cast<String>() ?? const [];
+      buf.writeln('— Сэмплы ответов (${samples.length} шт.) —');
+      for (int i = 0; i < samples.length; i++) {
+        buf.writeln('${i + 1}. ${samples[i]}');
+      }
+    }
+    return buf.toString();
+  }
+
+  Future<void> _copyToClipboard() async {
+    final q = widget.question;
+    final type = q['type'] as String? ?? '';
+    final total = (q['total_answers'] as num?)?.toInt() ?? 0;
+    final dist = (q['distribution'] as Map?)?.cast<String, dynamic>() ?? {};
+    final text = _buildCopyText(type, dist, total);
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: const Text('Данные скопированы в буфер обмена',
+          style: TextStyle(fontFamily: 'HSESans')),
+      duration: const Duration(seconds: 2),
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  /// Снимок карточки как PNG и скачивание через Blob.
+  /// pixelRatio=3 даёт читаемые подписи в PDF/Word (Retina-плотность).
+  /// Файл получает имя на основе заголовка вопроса — чтобы при пакетной
+  /// выгрузке (10 карточек подряд) файлы не сливались в q.png/q-1.png.
+  Future<void> _downloadAsPng() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final boundary = _captureKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) {
+        throw Exception('Карточка не готова к снимку (RenderObject is null)');
+      }
+      final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) {
+        throw Exception('toByteData вернул null');
+      }
+      final bytes = byteData.buffer.asUint8List();
+      final filename = _safeFilename(widget.question['title'] as String?);
+
+      if (kIsWeb) {
+        _triggerWebDownload(bytes, '$filename.png');
+      } else {
+        throw UnsupportedError('Скачивание поддерживается только в веб-версии');
+      }
+
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+        content: Text('График сохранён: $filename.png',
+            style: const TextStyle(fontFamily: 'HSESans')),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+        content: Text('Не удалось сохранить график: $e',
+            style: const TextStyle(fontFamily: 'HSESans')),
+        backgroundColor: Colors.red.shade700,
+      ));
+    }
+  }
+
+  /// Делает безопасное имя файла из заголовка вопроса.
+  /// Убирает символы, недопустимые в Windows/macOS, режет до 60 символов,
+  /// и обязательно даёт fallback на «question», если заголовок пустой.
+  String _safeFilename(String? title) {
+    final t = (title ?? '').trim();
+    if (t.isEmpty) return 'question';
+    final cleaned = t.replaceAll(RegExp(r'[\\/:*?"<>|]'), '');
+    final shortened =
+        cleaned.length > 60 ? cleaned.substring(0, 60) : cleaned;
+    return shortened.replaceAll(' ', '_');
+  }
+
+  /// Создаёт Blob и инициирует скачивание через программный клик по anchor.
+  /// Та же логика, что в ApiClient.downloadAuthed, но локальная — без HTTP.
+  void _triggerWebDownload(Uint8List bytes, String filename) {
+    final part = bytes.toJS;
+    final blob = web.Blob(
+      <JSAny>[part].toJS,
+      web.BlobPropertyBag(type: 'image/png'),
+    );
+    final blobUrl = web.URL.createObjectURL(blob);
+    final a = web.document.createElement('a') as web.HTMLAnchorElement;
+    a.href = blobUrl;
+    a.download = filename;
+    web.document.body!.appendChild(a);
+    a.click();
+    a.remove();
+    web.URL.revokeObjectURL(blobUrl);
   }
 
   @override
@@ -168,35 +350,76 @@ class _QuestionAnalyticsCardState extends State<QuestionAnalyticsCard> {
     final dist = (q['distribution'] as Map?)?.cast<String, dynamic>() ?? {};
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(q['title'] as String? ?? '',
-                style: const TextStyle(
-                    fontFamily: 'HSESans',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600)),
-            Text(_pluralAnswers(total),
-                style: const TextStyle(
-                    fontFamily: 'HSESans',
-                    color: HseColors.muted,
-                    fontSize: 12)),
-            if (total > 0) ...[
-              const SizedBox(height: 12),
-              _statsRow(type, dist),
-              const SizedBox(height: 12),
-              _chipBar(type),
-              const SizedBox(height: 12),
-              _chartBody(type, dist),
-            ] else ...[
-              const SizedBox(height: 16),
-              const Text('Нет данных',
-                  style: TextStyle(
-                      fontFamily: 'HSESans', color: HseColors.muted)),
+      // RepaintBoundary вокруг ВНУТРЕННЕГО Padding'a, не вокруг карточки —
+      // так на сохранённой PNG будет нормальный отступ и не будет
+      // болтаться граница shadowа Card'а по краям. Кнопки «копировать /
+      // скачать» специально внутри boundary: на скриншоте они тоже видны,
+      // но это не критично (PNG идёт в курсовую/отчёт, не в финальный
+      // верстальный pipeline). Если позже захочется их прятать на снимке —
+      // оборачиваем в Visibility(maintainState: true) с переключаемым
+      // флагом перед toImage().
+      child: RepaintBoundary(
+        key: _captureKey,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Шапка: заголовок слева, две иконки-действия справа.
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(q['title'] as String? ?? '',
+                            style: const TextStyle(
+                                fontFamily: 'HSESans',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600)),
+                        Text(_pluralAnswers(total),
+                            style: const TextStyle(
+                                fontFamily: 'HSESans',
+                                color: HseColors.muted,
+                                fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  if (total > 0) ...[
+                    IconButton(
+                      icon: const Icon(Icons.copy_rounded, size: 18),
+                      tooltip:
+                          'Скопировать текст вопроса, ответы и статистику',
+                      visualDensity: VisualDensity.compact,
+                      color: HseColors.muted,
+                      onPressed: _copyToClipboard,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.download_rounded, size: 18),
+                      tooltip: 'Скачать график PNG с подписями',
+                      visualDensity: VisualDensity.compact,
+                      color: HseColors.muted,
+                      onPressed: _downloadAsPng,
+                    ),
+                  ],
+                ],
+              ),
+              if (total > 0) ...[
+                const SizedBox(height: 12),
+                _statsRow(type, dist),
+                const SizedBox(height: 12),
+                _chipBar(type),
+                const SizedBox(height: 12),
+                _chartBody(type, dist),
+              ] else ...[
+                const SizedBox(height: 16),
+                const Text('Нет данных',
+                    style: TextStyle(
+                        fontFamily: 'HSESans', color: HseColors.muted)),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
