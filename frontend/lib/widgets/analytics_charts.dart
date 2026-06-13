@@ -158,13 +158,13 @@ class _QuestionAnalyticsCardState extends State<QuestionAnalyticsCard> {
   _NumChart _num = _NumChart.histogram;
   _TxtChart _txt = _TxtChart.samples;
 
-  /// Ключ на оборачивающий RepaintBoundary — нужен для «скачать как PNG».
-  /// Через него получаем RenderRepaintBoundary, который умеет дать
-  /// растровый снимок содержимого карточки (заголовок + статистика +
-  /// текущий выбранный график). Получается готовая картинка для вставки
-  /// в курсовую/отчёт — с уже отрисованными подписями и числами, ничего
-  /// дополнительно подписывать не нужно.
-  final GlobalKey _captureKey = GlobalKey();
+  // RepaintBoundary внутри видимой UI убран: на снимок нужны только
+  // заголовок и сам график на белом фоне — без бэйджей статистики
+  // и без чипов переключения вида. Снимок строится по запросу через
+  // OverlayEntry: туда временно вставляется отдельный виджет с
+  // нужной композицией, после захвата overlay удаляется. Это чище,
+  // чем рендерить «скрытый клон» постоянно — экономит фрейм-перерасчёт
+  // на странице с десятками карточек.
 
   String _pluralAnswers(int n) {
     if (n % 100 >= 11 && n % 100 <= 19) return '$n ответов';
@@ -268,17 +268,103 @@ class _QuestionAnalyticsCardState extends State<QuestionAnalyticsCard> {
     ));
   }
 
-  /// Снимок карточки как PNG и скачивание через Blob.
-  /// pixelRatio=3 даёт читаемые подписи в PDF/Word (Retina-плотность).
-  /// Файл получает имя на основе заголовка вопроса — чтобы при пакетной
-  /// выгрузке (10 карточек подряд) файлы не сливались в q.png/q-1.png.
+  /// Снимок «заголовок + график на белом фоне» и скачивание через Blob.
+  ///
+  /// Технически:
+  ///   1. Создаётся OverlayEntry с виджетом-снимком, расположенным далеко
+  ///      за пределами viewport'a (left: -10000). Виджет не видим
+  ///      пользователю, но проходит layout и paint — то есть его можно
+  ///      захватить через RenderRepaintBoundary.toImage().
+  ///   2. Содержимое снимка: белый контейнер с заголовком вопроса вверху
+  ///      и текущим выбранным видом графика ниже. Бэйджи статистики
+  ///      и переключатель вида — НЕ ВКЛЮЧАЮТСЯ: на экспорт идёт только
+  ///      то, что пользователь хочет вставить в курсовую/отчёт.
+  ///   3. После одного фрейма (endOfFrame) — toImage(pixelRatio: 3.0),
+  ///      Retina-плотность, чтобы подписи остались читаемыми в Word/PDF.
+  ///   4. Overlay удаляется, не оставляя лишних виджетов в дереве.
+  ///
+  /// Ширина снимка фиксирована (720 px) — компромисс между разрешением
+  /// для печати и весом файла. На pixelRatio=3 это даёт 2160 px по ширине
+  /// итогового PNG, что покрывает большинство сценариев вставки.
   Future<void> _downloadAsPng() async {
     final messenger = ScaffoldMessenger.of(context);
+    final q = widget.question;
+    final type = q['type'] as String? ?? '';
+    final total = (q['total_answers'] as num?)?.toInt() ?? 0;
+    final dist = (q['distribution'] as Map?)?.cast<String, dynamic>() ?? {};
+    if (total == 0) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Нет данных для сохранения',
+            style: TextStyle(fontFamily: 'HSESans')),
+      ));
+      return;
+    }
+
+    final captureKey = GlobalKey();
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final entry = OverlayEntry(
+      builder: (_) => Positioned(
+        // Сильно за пределами видимой области — пользователь не увидит
+        // мерцания. top: 0 (а не -10000): отрицательный top иногда
+        // ломает constrained layout у некоторых child'ов fl_chart.
+        left: -10000,
+        top: 0,
+        child: Material(
+          color: Colors.transparent,
+          child: SizedBox(
+            width: 720,
+            child: RepaintBoundary(
+              key: captureKey,
+              child: Container(
+                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      q['title'] as String? ?? '',
+                      style: const TextStyle(
+                        fontFamily: 'HSESans',
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                        height: 1.3,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        _pluralAnswers(total),
+                        style: const TextStyle(
+                          fontFamily: 'HSESans',
+                          color: HseColors.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _chartBody(type, dist),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(entry);
+
     try {
-      final boundary = _captureKey.currentContext?.findRenderObject()
+      // Ждём, пока виджет успеет пройти layout + paint. Один фрейм —
+      // достаточно для статичных charts; fl_chart не делает анимаций
+      // на mount без явной настройки.
+      await WidgetsBinding.instance.endOfFrame;
+
+      final boundary = captureKey.currentContext?.findRenderObject()
           as RenderRepaintBoundary?;
       if (boundary == null) {
-        throw Exception('Карточка не готова к снимку (RenderObject is null)');
+        throw Exception('Снимок не готов: RenderObject is null');
       }
       final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
       final byteData =
@@ -287,7 +373,7 @@ class _QuestionAnalyticsCardState extends State<QuestionAnalyticsCard> {
         throw Exception('toByteData вернул null');
       }
       final bytes = byteData.buffer.asUint8List();
-      final filename = _safeFilename(widget.question['title'] as String?);
+      final filename = _safeFilename(q['title'] as String?);
 
       if (kIsWeb) {
         _triggerWebDownload(bytes, '$filename.png');
@@ -309,6 +395,11 @@ class _QuestionAnalyticsCardState extends State<QuestionAnalyticsCard> {
             style: const TextStyle(fontFamily: 'HSESans')),
         backgroundColor: Colors.red.shade700,
       ));
+    } finally {
+      // Удаляем overlay в любом случае — даже если что-то упало.
+      // Иначе offstage-виджет «зависает» в дереве и при следующей
+      // попытке кнопки конфликтует с предыдущим.
+      entry.remove();
     }
   }
 
@@ -350,76 +441,68 @@ class _QuestionAnalyticsCardState extends State<QuestionAnalyticsCard> {
     final dist = (q['distribution'] as Map?)?.cast<String, dynamic>() ?? {};
 
     return Card(
-      // RepaintBoundary вокруг ВНУТРЕННЕГО Padding'a, не вокруг карточки —
-      // так на сохранённой PNG будет нормальный отступ и не будет
-      // болтаться граница shadowа Card'а по краям. Кнопки «копировать /
-      // скачать» специально внутри boundary: на скриншоте они тоже видны,
-      // но это не критично (PNG идёт в курсовую/отчёт, не в финальный
-      // верстальный pipeline). Если позже захочется их прятать на снимке —
-      // оборачиваем в Visibility(maintainState: true) с переключаемым
-      // флагом перед toImage().
-      child: RepaintBoundary(
-        key: _captureKey,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Шапка: заголовок слева, две иконки-действия справа.
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(q['title'] as String? ?? '',
-                            style: const TextStyle(
-                                fontFamily: 'HSESans',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600)),
-                        Text(_pluralAnswers(total),
-                            style: const TextStyle(
-                                fontFamily: 'HSESans',
-                                color: HseColors.muted,
-                                fontSize: 12)),
-                      ],
-                    ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Шапка: заголовок слева, две иконки-действия справа.
+            // RepaintBoundary тут НЕТ — снимок собирается отдельно в
+            // overlay-виджете (см. _downloadAsPng), чтобы на PNG не
+            // попали бэйджи статистики и переключатель вида.
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(q['title'] as String? ?? '',
+                          style: const TextStyle(
+                              fontFamily: 'HSESans',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600)),
+                      Text(_pluralAnswers(total),
+                          style: const TextStyle(
+                              fontFamily: 'HSESans',
+                              color: HseColors.muted,
+                              fontSize: 12)),
+                    ],
                   ),
-                  if (total > 0) ...[
-                    IconButton(
-                      icon: const Icon(Icons.copy_rounded, size: 18),
-                      tooltip:
-                          'Скопировать текст вопроса, ответы и статистику',
-                      visualDensity: VisualDensity.compact,
-                      color: HseColors.muted,
-                      onPressed: _copyToClipboard,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.download_rounded, size: 18),
-                      tooltip: 'Скачать график PNG с подписями',
-                      visualDensity: VisualDensity.compact,
-                      color: HseColors.muted,
-                      onPressed: _downloadAsPng,
-                    ),
-                  ],
+                ),
+                if (total > 0) ...[
+                  IconButton(
+                    icon: const Icon(Icons.copy_rounded, size: 18),
+                    tooltip:
+                        'Скопировать текст вопроса, ответы и статистику',
+                    visualDensity: VisualDensity.compact,
+                    color: HseColors.muted,
+                    onPressed: _copyToClipboard,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.download_rounded, size: 18),
+                    tooltip: 'Скачать график PNG с заголовком',
+                    visualDensity: VisualDensity.compact,
+                    color: HseColors.muted,
+                    onPressed: _downloadAsPng,
+                  ),
                 ],
-              ),
-              if (total > 0) ...[
-                const SizedBox(height: 12),
-                _statsRow(type, dist),
-                const SizedBox(height: 12),
-                _chipBar(type),
-                const SizedBox(height: 12),
-                _chartBody(type, dist),
-              ] else ...[
-                const SizedBox(height: 16),
-                const Text('Нет данных',
-                    style: TextStyle(
-                        fontFamily: 'HSESans', color: HseColors.muted)),
               ],
+            ),
+            if (total > 0) ...[
+              const SizedBox(height: 12),
+              _statsRow(type, dist),
+              const SizedBox(height: 12),
+              _chipBar(type),
+              const SizedBox(height: 12),
+              _chartBody(type, dist),
+            ] else ...[
+              const SizedBox(height: 16),
+              const Text('Нет данных',
+                  style: TextStyle(
+                      fontFamily: 'HSESans', color: HseColors.muted)),
             ],
-          ),
+          ],
         ),
       ),
     );
