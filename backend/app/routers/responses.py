@@ -56,6 +56,8 @@ def _public_detail(s: Survey) -> SurveyDetail:
         one_response_per_user=s.one_response_per_user,
         allow_back_navigation=s.allow_back_navigation,
         show_progress=s.show_progress,
+        consent_required=s.consent_required,
+        consent_text=s.consent_text,
         theme=s.theme or {},
         parent_survey_id=s.parent_survey_id,
         variant_label=s.variant_label,
