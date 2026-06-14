@@ -79,17 +79,26 @@
       var tg = window.Telegram && window.Telegram.WebApp;
       if (!tg) { return; }
       var p = tg.themeParams || {};
-      window.tgThemeParams = {
-        bg_color: p.bg_color || null,
-        text_color: p.text_color || null,
-        hint_color: p.hint_color || null,
-        link_color: p.link_color || null,
-        button_color: p.button_color || null,
-        button_text_color: p.button_text_color || null,
-        secondary_bg_color: p.secondary_bg_color || null,
-        header_bg_color: p.header_bg_color || null,
-        color_scheme: tg.colorScheme || 'light'
-      };
+      // Раскладываем тему в ПЛОСКИЕ строковые свойства window — так
+      // надёжнее, чем nested-объект: Dart js_interop стабильно читает
+      // простые window.<key> через js_interop_unsafe.getProperty,
+      // а вложенный JSObject требует дополнительного парсинга.
+      window.tgBgColor          = p.bg_color || '';
+      window.tgTextColor        = p.text_color || '';
+      window.tgHintColor        = p.hint_color || '';
+      window.tgLinkColor        = p.link_color || '';
+      window.tgButtonColor      = p.button_color || '';
+      window.tgButtonTextColor  = p.button_text_color || '';
+      window.tgSecondaryBgColor = p.secondary_bg_color || '';
+      window.tgHeaderBgColor    = p.header_bg_color || '';
+      window.tgColorScheme      = tg.colorScheme || 'light';
+      window.tgThemeReady       = true;
+      console.log('[tg-theme] synced:', {
+        scheme: window.tgColorScheme,
+        bg: window.tgBgColor,
+        text: window.tgTextColor,
+        button: window.tgButtonColor,
+      });
       try {
         window.dispatchEvent(new CustomEvent('tg-theme-changed'));
       } catch (e) { /* old browsers — fallback не нужен */ }

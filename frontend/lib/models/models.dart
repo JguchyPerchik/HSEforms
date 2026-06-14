@@ -166,6 +166,14 @@ class Survey {
   bool oneResponsePerUser;
   bool allowBackNavigation;
   bool showProgress;
+  /// Если true, перед прохождением опроса респонденту показывается
+  /// модальное окно с текстом информированного согласия (см. [consentText]).
+  /// Без явного принятия опрос недоступен.
+  bool consentRequired;
+  /// Текст информированного согласия. Если null или пусто — фронт
+  /// подставляет дефолтный академический шаблон, лежащий в коде
+  /// (см. kDefaultConsentText в widgets/survey_settings_panel.dart).
+  String? consentText;
   Map<String, dynamic> theme;
   int? parentSurveyId;
   String? variantLabel;
@@ -181,6 +189,7 @@ class Survey {
     required this.slug, required this.status,
     this.isAnonymous = true, this.oneResponsePerUser = false,
     this.allowBackNavigation = true, this.showProgress = true,
+    this.consentRequired = false, this.consentText,
     Map<String, dynamic>? theme, this.parentSurveyId,
     this.variantLabel, this.variantWeight = 1.0,
     this.assignmentMode = 'random',
@@ -197,6 +206,8 @@ class Survey {
     oneResponsePerUser: j['one_response_per_user'] ?? false,
     allowBackNavigation: j['allow_back_navigation'] ?? true,
     showProgress: j['show_progress'] ?? true,
+    consentRequired: j['consent_required'] ?? false,
+    consentText: j['consent_text'],
     theme: Map<String, dynamic>.from(j['theme'] ?? {}),
     parentSurveyId: j['parent_survey_id'],
     variantLabel: j['variant_label'],

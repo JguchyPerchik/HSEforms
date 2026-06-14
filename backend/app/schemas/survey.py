@@ -13,6 +13,8 @@ class SurveyCreate(BaseModel):
     one_response_per_user: bool = False
     allow_back_navigation: bool = True
     show_progress: bool = True
+    consent_required: bool = False
+    consent_text: str | None = None
     theme: dict[str, Any] | None = None
     parent_survey_id: int | None = None
     variant_weight: float = 1.0
@@ -28,6 +30,8 @@ class SurveyUpdate(BaseModel):
     one_response_per_user: bool | None = None
     allow_back_navigation: bool | None = None
     show_progress: bool | None = None
+    consent_required: bool | None = None
+    consent_text: str | None = None
     theme: dict[str, Any] | None = None
     variant_weight: float | None = None
     variant_label: str | None = None
@@ -56,6 +60,8 @@ class SurveyDetail(SurveySummary):
     one_response_per_user: bool
     allow_back_navigation: bool
     show_progress: bool
+    consent_required: bool = False
+    consent_text: str | None = None
     theme: dict[str, Any]
     assignment_mode: str = "random"
     questions: list[QuestionOut] = Field(default_factory=list)

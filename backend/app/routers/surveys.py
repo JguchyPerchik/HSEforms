@@ -43,6 +43,8 @@ def _to_detail(s: Survey, variants: list[Survey]) -> SurveyDetail:
         one_response_per_user=s.one_response_per_user,
         allow_back_navigation=s.allow_back_navigation,
         show_progress=s.show_progress,
+        consent_required=s.consent_required,
+        consent_text=s.consent_text,
         theme=s.theme or {},
         parent_survey_id=s.parent_survey_id,
         variant_label=s.variant_label,
@@ -187,6 +189,8 @@ async def duplicate_survey(
         one_response_per_user=src.one_response_per_user,
         allow_back_navigation=src.allow_back_navigation,
         show_progress=src.show_progress,
+        consent_required=src.consent_required,
+        consent_text=src.consent_text,
         theme=dict(src.theme or {}),
     )
     db.add(copy)

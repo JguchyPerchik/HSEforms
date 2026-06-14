@@ -39,6 +39,15 @@ class Survey(Base):
     allow_back_navigation: Mapped[bool] = mapped_column(Boolean, default=True)
     show_progress: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    # Информированное согласие. Если включено — респондент перед опросом
+    # увидит модальное окно с текстом согласия (см. consent_text) и
+    # кнопками «Принять» / «Отказаться». Без принятия опрос не
+    # начинается. consent_text может быть None — тогда фронт подставит
+    # дефолтный шаблон, хранящийся в коде. Юридическая сила текста —
+    # ответственность исследователя, платформа лишь предоставляет UI.
+    consent_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    consent_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     theme: Mapped[dict] = mapped_column(
         JSONB,
         default=lambda: {

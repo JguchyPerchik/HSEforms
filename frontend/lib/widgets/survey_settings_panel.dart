@@ -1,7 +1,41 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
 import '../theme.dart';
+
+/// Дефолтный шаблон информированного согласия. Подставляется в
+/// `survey.consent_text`, когда автор впервые включает соответствующий
+/// тумблер. Текст составлен под академические опросы (соц.науки,
+/// психология) — содержит обязательные смысловые блоки: цель, что
+/// потребуется, конфиденциальность, добровольность, контакты. Поля в
+/// квадратных скобках автор должен заполнить под своё исследование.
+///
+/// Юридическая сила текста — ответственность автора опроса. Если опрос
+/// собирает чувствительные данные (медицинские, ФИО, контакты), такой
+/// шаблон стоит дополнительно согласовать с этическим комитетом.
+const String kDefaultConsentText =
+    'Информированное согласие на участие в исследовании\n\n'
+    'Уважаемый респондент!\n\n'
+    'Вам предлагается принять участие в исследовании. Перед тем, как '
+    'продолжить, пожалуйста, ознакомьтесь с условиями участия.\n\n'
+    'Цель исследования: [укажите цель исследования].\n\n'
+    'Что от вас потребуется: заполнение этой анкеты, занимающее '
+    'примерно [укажите время] минут.\n\n'
+    'Конфиденциальность: ваши ответы будут использоваться только в '
+    'обобщённом виде в исследовательских целях. Персональные данные не '
+    'передаются третьим лицам и не используются для коммерческих целей.\n\n'
+    'Анонимность: вы можете участвовать в исследовании анонимно. '
+    'Идентифицирующая информация (имя, контакты) собирается только если '
+    'это явно указано в анкете.\n\n'
+    'Добровольность: ваше участие полностью добровольное. Вы можете '
+    'отказаться от прохождения в любой момент, закрыв вкладку браузера. '
+    'Незавершённые ответы не сохраняются.\n\n'
+    'Контакты исследователя: [укажите ФИО и email для вопросов].\n\n'
+    'Нажимая «Принять», вы подтверждаете, что ознакомились с условиями '
+    'и даёте согласие на обработку ваших ответов в рамках указанного '
+    'исследования.';
 
 class SurveySettingsPanel extends StatelessWidget {
   /// Опрос, который пользователь сейчас редактирует. Может быть как
@@ -86,6 +120,34 @@ class SurveySettingsPanel extends StatelessWidget {
           value: survey.showProgress,
           onChanged: (v) => onSettingsChanged({'show_progress': v}),
         ),
+        // Информированное согласие. При включении тумблера, если текст
+        // согласия ещё не задан, сразу же отправляем на backend дефолтный
+        // шаблон — иначе пользователь увидит пустой редактор и не поймёт,
+        // что нужно вписать. Дефолт можно редактировать, перезаписав
+        // под своё исследование.
+        _Setting(
+          title: 'Информированное согласие',
+          subtitle: 'Модальное окно с согласием перед прохождением опроса',
+          value: survey.consentRequired,
+          onChanged: (v) {
+            final updates = <String, dynamic>{'consent_required': v};
+            if (v &&
+                (survey.consentText == null ||
+                    survey.consentText!.trim().isEmpty)) {
+              updates['consent_text'] = kDefaultConsentText;
+            }
+            onSettingsChanged(updates);
+          },
+        ),
+        if (survey.consentRequired)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 4),
+            child: _ConsentEditor(
+              key: ValueKey('consent-${survey.id}'),
+              initialText: survey.consentText ?? kDefaultConsentText,
+              onChanged: (t) => onSettingsChanged({'consent_text': t}),
+            ),
+          ),
         const SizedBox(height: 28),
         _SectionHeader(text: 'A/B И ВИНЬЕТКИ'),
         const SizedBox(height: 6),
@@ -640,6 +702,107 @@ class _VariantRow extends StatelessWidget {
         onTap: onSelect,
         child: content,
       ),
+    );
+  }
+}
+
+/// Редактор текста информированного согласия. Многострочный TextField
+/// с debounce-сохранением (700 мс): на сервер уходит только финальная
+/// версия после паузы в наборе, чтобы не дёргать API на каждое нажатие
+/// клавиши. Стандартный паттерн для авто-сохраняющихся полей в
+/// builder'е опроса (см. также автосохранение заголовка и описания).
+class _ConsentEditor extends StatefulWidget {
+  final String initialText;
+  final ValueChanged<String> onChanged;
+  const _ConsentEditor({
+    super.key,
+    required this.initialText,
+    required this.onChanged,
+  });
+
+  @override
+  State<_ConsentEditor> createState() => _ConsentEditorState();
+}
+
+class _ConsentEditorState extends State<_ConsentEditor> {
+  late final TextEditingController _ctrl;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.initialText);
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _onLocalChange(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 700), () {
+      widget.onChanged(value);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: HseColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(HseRadius.md),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text(
+          'Текст согласия',
+          style: TextStyle(
+            color: HseColors.muted,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 6),
+        // Многострочное поле без ограничения высоты — растёт по содержимому
+        // до 14 строк, после чего появляется внутренний скролл.
+        TextField(
+          controller: _ctrl,
+          minLines: 5,
+          maxLines: 14,
+          onChanged: _onLocalChange,
+          style: const TextStyle(fontSize: 12.5, height: 1.4),
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10, vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(HseRadius.sm),
+              borderSide: const BorderSide(color: HseColors.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(HseRadius.sm),
+              borderSide: const BorderSide(color: HseColors.border),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Замените текст в квадратных скобках на сведения о вашем '
+          'исследовании. Если опрос собирает чувствительные данные, '
+          'согласуйте текст с этическим комитетом.',
+          style: TextStyle(
+            color: HseColors.muted,
+            fontSize: 11,
+            height: 1.35,
+          ),
+        ),
+      ]),
     );
   }
 }

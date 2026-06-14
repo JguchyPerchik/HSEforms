@@ -99,11 +99,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           const SizedBox(width: 8),
         ],
       ),
+      // SelectionArea на ВСЁМ body аналитики: пользователь может
+      // мышкой выделить любой текст — заголовки вопросов, плашки
+      // статистики (N=, M=, ...), значения и проценты в таблицах,
+      // подписи на чипах графиков — и скопировать стандартным
+      // Ctrl+C. Раньше Flutter-Text был неинтерактивным, что для
+      // экрана с числами и текстами особенно неудобно: при подготовке
+      // курсовой / отчёта приходилось каждый раз пересчитывать число
+      // вручную или дёргать «📋 копировать» для всего вопроса целиком.
+      // Теперь выделение работает естественно, как в обычном веб-документе.
       body: _err != null
-          ? Center(child: Text(_err!))
+          ? Center(child: SelectionArea(child: Text(_err!)))
           : data == null
               ? const Center(child: CircularProgressIndicator())
-              : ListView(
+              : SelectionArea(
+                  child: ListView(
                   padding: const EdgeInsets.all(24),
                   children: [
                     Card(
@@ -143,6 +153,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       ),
                   ],
                 ),
+                ),  // close SelectionArea
     );
   }
 

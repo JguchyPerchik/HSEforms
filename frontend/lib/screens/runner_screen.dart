@@ -9,6 +9,7 @@ import '../api/api_client.dart';
 import '../models/models.dart';
 import '../theme.dart';
 import '../widgets/question_renderer.dart';
+import '../widgets/survey_settings_panel.dart' show kDefaultConsentText;
 import '../utils/conditional.dart';
 
 class RunnerScreen extends StatefulWidget {
@@ -55,6 +56,14 @@ class _RunnerScreenState extends State<RunnerScreen> {
   /// Value: -1 = skipped, 0 = original, 1..n = variant index (1-based; n = variants[n-1]).
   final Map<int, int> _variantAssignment = {};
   int _seed = 0;
+
+  /// Принял ли респондент информированное согласие. Поведение барьерное:
+  /// пока `false` — вместо вопросов показывается экран с текстом
+  /// согласия и кнопкой «Принять». При закрытии вкладки / refresh'е
+  /// флаг сбрасывается — для каждой новой сессии согласие подтверждается
+  /// заново, что юридически чище, чем «один раз принял — больше не
+  /// спрашиваем», особенно если опрос правят между сессиями.
+  bool _consentAccepted = false;
 
   bool get _isPreview => widget.isCreatorPreview || responseId == null;
 
@@ -322,6 +331,15 @@ class _RunnerScreenState extends State<RunnerScreen> {
           body: Center(
               child: Text('Опрос не найден',
                   style: TextStyle(fontFamily: 'HSESans'))));
+    }
+
+    // Барьер информированного согласия: показываем экран с текстом
+    // согласия ВМЕСТО опроса, пока респондент явно не нажал «Принять».
+    // В preview-режиме (владелец смотрит свой опрос) барьер пропускается:
+    // владельцу глупо требовать согласие на собственное исследование,
+    // плюс это даёт быстрее проверить вёрстку самого опроса.
+    if (survey!.consentRequired && !_consentAccepted && !widget.isCreatorPreview) {
+      return _buildConsentGate(survey!);
     }
 
     final s = survey!;
@@ -646,6 +664,118 @@ class _RunnerScreenState extends State<RunnerScreen> {
           ),  // close Center
         ),  // close SingleChildScrollView (вынесен наружу)
       ),  // close SafeArea
+    );
+  }
+
+  /// Экран-«барьер» с текстом информированного согласия. Возвращается
+  /// build()'ом ВМЕСТО основного UI опроса, пока респондент не нажал
+  /// «Принять». Если он нажмёт «Отказаться» — отправляем на главную
+  /// (для авторизованных пользователей — список опросов; для анонимов
+  /// просто закрывается обратно на сам экран согласия, что эквивалентно
+  /// «не могу пройти, ушёл»).
+  Widget _buildConsentGate(Survey s) {
+    final text = (s.consentText == null || s.consentText!.trim().isEmpty)
+        ? kDefaultConsentText
+        : s.consentText!;
+    final bg = _bg(s);
+    final primary = _primary(s);
+    return Scaffold(
+      backgroundColor: bg,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: primary.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.verified_user_outlined,
+                              color: primary, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            s.title.isEmpty ? '(без названия)' : s.title,
+                            style: const TextStyle(
+                              fontFamily: 'HSESans',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: HseColors.ink,
+                            ),
+                          ),
+                        ),
+                      ]),
+                      const SizedBox(height: 20),
+                      // SelectableText — респондент может скопировать
+                      // текст согласия, чтобы сохранить себе. Это полезно
+                      // юридически: пользователь имеет доступ к тому, на
+                      // что согласился.
+                      SelectableText(
+                        text,
+                        style: const TextStyle(
+                          fontFamily: 'HSESans',
+                          fontSize: 14,
+                          color: HseColors.ink,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              // Не пускаем дальше — уводим со страницы.
+                              // Для авторизованного юзера — на список
+                              // опросов, для анонимного — на login.
+                              context.go('/');
+                            },
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            child: const Text('Отказаться',
+                                style: TextStyle(fontFamily: 'HSESans')),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton.icon(
+                            onPressed: () =>
+                                setState(() => _consentAccepted = true),
+                            icon: const Icon(Icons.check_rounded, size: 18),
+                            label: const Text('Принять и пройти опрос'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              textStyle: const TextStyle(
+                                fontFamily: 'HSESans',
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ]),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
