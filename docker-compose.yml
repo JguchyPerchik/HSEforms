@@ -57,6 +57,27 @@ services:
       retries: 12
       start_period: 30s  # alembic upgrade head может занять время
 
+  bot:
+    # Telegram-бот живёт отдельным контейнером. Наружу ничего не
+    # пробрасывает — общается с Telegram Bot API через long-polling.
+    # Нужен, чтобы Mini App открывался через web_app-кнопку (это
+    # единственный способ получить themeParams и подписанные initData
+    # в WebView). Без бота сайт можно открыть в Telegram, но он будет
+    # рендериться без TG-темы и без авторизации пользователя.
+    build: ./bot
+    restart: unless-stopped
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      # Должен указывать на корень фронтенда (HTTPS обязателен —
+      # Telegram не открывает web_app по http://).
+      WEB_APP_URL: ${WEB_APP_URL:-https://hseforms.ru}
+    depends_on:
+      backend:
+        condition: service_healthy
+    # БД-зависимость пока не нужна — бот не пишет в Postgres напрямую.
+    # Все привязки telegram_id → user_id делает бэкенд при первом
+    # обращении Mini App с валидным initData.
+
   frontend:
     build: ./frontend
     restart: unless-stopped

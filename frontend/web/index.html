@@ -102,6 +102,23 @@
       try {
         window.dispatchEvent(new CustomEvent('tg-theme-changed'));
       } catch (e) { /* old browsers — fallback не нужен */ }
+
+      // Дополнительно подкрашиваем НАТИВНЫЙ хром Telegram (верхнюю
+      // плашку и фон под Mini App) — без этого заголовок остаётся
+      // в дефолтном цвете клиента и визуально отстаёт от нашего
+      // Flutter-рендера. Цвета берём те же, что отдал themeParams,
+      // чтобы Mini App смотрелся как родной экран Telegram.
+      try {
+        var tg = window.Telegram.WebApp;
+        // setHeaderColor поддерживает только 'bg_color' / 'secondary_bg_color'
+        // как алиасы, либо #hex (с Bot API 6.9+). Безопасный путь — алиас.
+        if (typeof tg.setHeaderColor === 'function') {
+          tg.setHeaderColor('bg_color');
+        }
+        if (typeof tg.setBackgroundColor === 'function' && window.tgBgColor) {
+          tg.setBackgroundColor(window.tgBgColor);
+        }
+      } catch (e) { /* старая версия клиента — просто пропускаем */ }
     }
 
     if (window.Telegram && window.Telegram.WebApp) {
@@ -110,6 +127,10 @@
         window.Telegram.WebApp.expand();
         syncTgTheme();
         window.Telegram.WebApp.onEvent('themeChanged', syncTgTheme);
+        // На некоторых клиентах (особенно Android) themeParams приходят
+        // не сразу — есть событие viewportChanged, после которого тема
+        // уже точно есть. Перечитываем для надёжности.
+        window.Telegram.WebApp.onEvent('viewportChanged', syncTgTheme);
       } catch (e) { }
     }
   </script>

@@ -45,6 +45,14 @@ class HseShadows {
 const String _bodyFont = 'HSESans';
 const String _displayFont = 'HSESans';
 
+/// Слегка осветляет цвет — нужно для тёмной темы Telegram, когда клиент
+/// не присылает secondary_bg_color и карточки иначе сливаются с фоном.
+Color _lighten(Color c, double amount) {
+  final hsl = HSLColor.fromColor(c);
+  final l = (hsl.lightness + amount).clamp(0.0, 1.0);
+  return hsl.withLightness(l).toColor();
+}
+
 /// Собирает основную тему приложения. Если передан [tg] и он
 /// `available` (приложение реально открыто в Telegram Mini App), ключевые
 /// цвета — фон, основной текст, primary-акцент — берутся из палитры
@@ -67,6 +75,22 @@ ThemeData buildHseTheme([TelegramTheme? tg]) {
   // Hint-цвет Telegram'a используем для muted-текста, как чуть менее
   // контрастного к background'у — это и есть его семантика в Telegram.
   final muted = (useTg ? tg.hint : null) ?? HseColors.muted;
+  // Цвет «карточек» — в TG берём secondary_bg (Telegram отдаёт более
+  // светлый/тёмный тон для группированных контейнеров). Если в тёмной
+  // теме Telegram не выставил secondary — слегка осветляем фон, чтобы
+  // карточки не сливались с background'ом.
+  final cardBg = useTg
+      ? (tg.secondaryBg ??
+          (isDark ? _lighten(bg, 0.04) : Colors.white))
+      : Colors.white;
+  // Цвет шапки приложения. Telegram отдаёт header_bg_color (часто
+  // совпадает с системным баром клиента). Если не пришёл — используем
+  // bg, чтобы appbar сливался с фоном (как в нативных TG-аппах).
+  final headerBg = useTg ? (tg.headerBg ?? bg) : Colors.white;
+  // Цвет текста на шапке/карточках — берём основной text. В тёмной
+  // теме Telegram это будет светлый, поэтому захардкоженный
+  // HseColors.ink (почти чёрный) больше не используем.
+  final onCard = text;
 
   final scheme = ColorScheme(
     brightness: isDark ? Brightness.dark : Brightness.light,
@@ -88,69 +112,83 @@ ThemeData buildHseTheme([TelegramTheme? tg]) {
     useMaterial3: true,
     colorScheme: scheme,
     fontFamily: _bodyFont,
-    scaffoldBackgroundColor: HseColors.background,
+    // В Telegram — берём bg клиента, иначе HSE-фон. Раньше тут был
+    // захардкожен HseColors.background, и тёмная тема Telegram «не
+    // прокрашивалась» — Flutter оставлял белый Scaffold поверх тёмного
+    // TG-WebView и интерфейс выглядел разорванным.
+    scaffoldBackgroundColor: bg,
     splashFactory: InkSparkle.splashFactory,
   );
 
+  // Цвета текста: основной (`text`) и приглушённый (`textSoft`/`muted`).
+  // Раньше эти три уровня были захардкожены в HseColors.ink / inkSoft /
+  // muted, из-за чего в тёмной теме Telegram (где фон тёмный) весь
+  // текст оставался почти чёрным и сливался. Теперь основной цвет
+  // приходит из TG (если есть), softLevel считаем как смешение
+  // основного с фоном — это даёт корректный «приглушённый» оттенок
+  // и для светлой, и для тёмной темы автоматически.
+  final textSoft = Color.alphaBlend(text.withValues(alpha: 0.72), bg);
+  final textMuted = useTg ? muted : HseColors.muted;
+
   final textTheme = base.textTheme.copyWith(
-    displayLarge: const TextStyle(
+    displayLarge: TextStyle(
         fontFamily: _displayFont,
         fontSize: 44,
         fontWeight: FontWeight.w600,
         height: 1.05,
-        color: HseColors.ink,
+        color: text,
         letterSpacing: -0.5),
-    displayMedium: const TextStyle(
+    displayMedium: TextStyle(
         fontFamily: _displayFont,
         fontSize: 34,
         fontWeight: FontWeight.w600,
         height: 1.1,
-        color: HseColors.ink,
+        color: text,
         letterSpacing: -0.3),
-    headlineLarge: const TextStyle(
+    headlineLarge: TextStyle(
         fontFamily: _displayFont,
         fontSize: 28,
         fontWeight: FontWeight.w700,
         height: 1.15,
-        color: HseColors.ink),
-    headlineMedium: const TextStyle(
+        color: text),
+    headlineMedium: TextStyle(
         fontFamily: _displayFont,
         fontSize: 22,
         fontWeight: FontWeight.w700,
         height: 1.2,
-        color: HseColors.ink),
-    headlineSmall: const TextStyle(
+        color: text),
+    headlineSmall: TextStyle(
         fontFamily: _bodyFont,
         fontSize: 18,
         fontWeight: FontWeight.w700,
-        color: HseColors.ink),
-    titleLarge: const TextStyle(
+        color: text),
+    titleLarge: TextStyle(
         fontFamily: _bodyFont,
         fontSize: 17,
         fontWeight: FontWeight.w700,
-        color: HseColors.ink),
-    titleMedium: const TextStyle(
+        color: text),
+    titleMedium: TextStyle(
         fontFamily: _bodyFont,
         fontSize: 15,
         fontWeight: FontWeight.w600,
-        color: HseColors.ink),
-    bodyLarge: const TextStyle(
+        color: text),
+    bodyLarge: TextStyle(
         fontFamily: _bodyFont,
         fontSize: 16,
         fontWeight: FontWeight.w400,
         height: 1.45,
-        color: HseColors.ink),
-    bodyMedium: const TextStyle(
+        color: text),
+    bodyMedium: TextStyle(
         fontFamily: _bodyFont,
         fontSize: 14.5,
         fontWeight: FontWeight.w400,
         height: 1.45,
-        color: HseColors.inkSoft),
-    bodySmall: const TextStyle(
+        color: textSoft),
+    bodySmall: TextStyle(
         fontFamily: _bodyFont,
         fontSize: 13,
         fontWeight: FontWeight.w400,
-        color: HseColors.muted),
+        color: textMuted),
     labelLarge: const TextStyle(
         fontFamily: _bodyFont,
         fontSize: 14,
@@ -161,9 +199,12 @@ ThemeData buildHseTheme([TelegramTheme? tg]) {
   return base.copyWith(
     textTheme: textTheme,
     primaryTextTheme: textTheme,
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Colors.white,
-      foregroundColor: HseColors.ink,
+    appBarTheme: AppBarTheme(
+      // headerBg — это или Telegram header_bg_color, или (fallback)
+      // основной bg; за пределами TG — белый. Захардкоженный
+      // Colors.white гарантировал светлую полоску поверх тёмного TG.
+      backgroundColor: headerBg,
+      foregroundColor: onCard,
       elevation: 0,
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
@@ -173,16 +214,16 @@ ThemeData buildHseTheme([TelegramTheme? tg]) {
           fontFamily: _displayFont,
           fontSize: 20,
           fontWeight: FontWeight.w700,
-          color: HseColors.ink),
-      iconTheme: IconThemeData(color: HseColors.ink),
+          color: onCard),
+      iconTheme: IconThemeData(color: onCard),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: HseColors.surface,
-      hintStyle:
-          const TextStyle(fontFamily: _displayFont, color: HseColors.muted),
-      labelStyle: const TextStyle(
-          color: HseColors.inkSoft, fontWeight: FontWeight.w500),
+      // В TG для филлера полей берём secondary_bg (Telegram-style
+      // grouped input), за пределами TG — старая HSE-плитка.
+      fillColor: useTg ? cardBg : HseColors.surface,
+      hintStyle: TextStyle(fontFamily: _displayFont, color: textMuted),
+      labelStyle: TextStyle(color: textSoft, fontWeight: FontWeight.w500),
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(HseRadius.md),
@@ -194,7 +235,8 @@ ThemeData buildHseTheme([TelegramTheme? tg]) {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(HseRadius.md),
-        borderSide: const BorderSide(color: HseColors.primaryBright, width: 2),
+        // Цвет фокуса — primary (Telegram button или HSE-primary).
+        borderSide: BorderSide(color: primary, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(HseRadius.md),
@@ -203,7 +245,8 @@ ThemeData buildHseTheme([TelegramTheme? tg]) {
     ),
     cardTheme: CardThemeData(
       elevation: 0,
-      color: Colors.white,
+      // Карточки берут цвет TG-secondary, иначе белый (как раньше).
+      color: cardBg,
       surfaceTintColor: Colors.transparent,
       shadowColor: const Color(0x0A14182B),
       shape: RoundedRectangleBorder(
@@ -213,8 +256,11 @@ ThemeData buildHseTheme([TelegramTheme? tg]) {
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: HseColors.primary,
-        foregroundColor: Colors.white,
+        // В TG основная кнопка должна совпадать с button_color клиента
+        // (это явное требование гайдлайна Telegram Mini Apps —
+        // primary action в нативном TG-стиле).
+        backgroundColor: primary,
+        foregroundColor: onPrimary,
         disabledBackgroundColor: HseColors.borderStrong,
         elevation: 0,
         shadowColor: Colors.transparent,
@@ -230,9 +276,9 @@ ThemeData buildHseTheme([TelegramTheme? tg]) {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: HseColors.primary,
-        backgroundColor: Colors.white,
-        side: const BorderSide(color: HseColors.borderStrong, width: 1.5),
+        foregroundColor: primary,
+        backgroundColor: cardBg,
+        side: BorderSide(color: textMuted.withValues(alpha: 0.4), width: 1.5),
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(HseRadius.md)),
@@ -242,7 +288,11 @@ ThemeData buildHseTheme([TelegramTheme? tg]) {
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: HseColors.primaryBright,
+        // Текстовая кнопка — это «ссылка»: в TG для неё используется
+        // link_color (отличается от button_color), за пределами TG —
+        // вторичный HSE-синий.
+        foregroundColor:
+            useTg ? (tg.link ?? primary) : HseColors.primaryBright,
         textStyle: const TextStyle(
             fontFamily: _displayFont, fontWeight: FontWeight.w600),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -252,24 +302,24 @@ ThemeData buildHseTheme([TelegramTheme? tg]) {
     ),
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(
-        foregroundColor: HseColors.inkSoft,
+        foregroundColor: textSoft,
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(HseRadius.sm)),
       ),
     ),
-    dividerTheme:
-        const DividerThemeData(color: HseColors.border, thickness: 1, space: 1),
+    dividerTheme: DividerThemeData(
+        color: textMuted.withValues(alpha: 0.25), thickness: 1, space: 1),
     chipTheme: ChipThemeData(
-      backgroundColor: HseColors.surface,
-      selectedColor: HseColors.primary,
-      labelStyle: const TextStyle(
+      backgroundColor: cardBg,
+      selectedColor: primary,
+      labelStyle: TextStyle(
           fontFamily: _displayFont,
-          color: HseColors.ink,
+          color: text,
           fontWeight: FontWeight.w600,
           fontSize: 13.5),
-      secondaryLabelStyle: const TextStyle(
+      secondaryLabelStyle: TextStyle(
           fontFamily: _displayFont,
-          color: Colors.white,
+          color: onPrimary,
           fontWeight: FontWeight.w600),
       side: BorderSide.none,
       shape: RoundedRectangleBorder(
@@ -278,38 +328,40 @@ ThemeData buildHseTheme([TelegramTheme? tg]) {
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: HseColors.ink,
-      contentTextStyle: const TextStyle(
+      // Снэк в тёмной TG-теме на чёрном фоне выглядит «дырой»;
+      // в светлой остаётся прежний контрастный чёрный.
+      backgroundColor: isDark ? cardBg : HseColors.ink,
+      contentTextStyle: TextStyle(
           fontFamily: _displayFont,
-          color: Colors.white,
+          color: isDark ? text : Colors.white,
           fontWeight: FontWeight.w500),
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(HseRadius.md)),
     ),
     dialogTheme: DialogThemeData(
-      backgroundColor: Colors.white,
+      backgroundColor: cardBg,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(HseRadius.lg)),
-      titleTextStyle: const TextStyle(
+      titleTextStyle: TextStyle(
           fontFamily: _displayFont,
           fontSize: 22,
           fontWeight: FontWeight.w700,
-          color: HseColors.ink),
+          color: text),
     ),
-    floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: HseColors.primary,
-      foregroundColor: Colors.white,
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: primary,
+      foregroundColor: onPrimary,
       elevation: 6,
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((s) =>
-          s.contains(WidgetState.selected) ? Colors.white : Colors.white),
-      trackColor: WidgetStateProperty.resolveWith((s) =>
-          s.contains(WidgetState.selected)
-              ? HseColors.primary
-              : HseColors.borderStrong),
+          s.contains(WidgetState.selected) ? onPrimary : Colors.white),
+      trackColor: WidgetStateProperty.resolveWith((s) => s.contains(
+              WidgetState.selected)
+          ? primary
+          : (useTg ? textMuted.withValues(alpha: 0.4) : HseColors.borderStrong)),
       trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
     ),
   );
@@ -396,10 +448,15 @@ class SoftCard extends StatelessWidget {
       this.onTap});
   @override
   Widget build(BuildContext context) {
+    // Раньше дефолт был Colors.white — в тёмной теме Telegram это
+    // означало белые карточки на тёмном фоне. Теперь берём цвет
+    // карточки из текущей темы (она уже резолвлена с учётом TG).
+    final cardColor =
+        color ?? Theme.of(context).cardTheme.color ?? Colors.white;
     final body = Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: color ?? Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(HseRadius.lg),
         boxShadow: HseShadows.card,
       ),

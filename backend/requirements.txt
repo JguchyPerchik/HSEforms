@@ -13,6 +13,10 @@ redis==5.0.8
 email-validator==2.2.0
 slowapi==0.1.9
 itsdangerous==2.2.0
+# Async HTTP-клиент: используется в импорте опросов из Google Forms /
+# Яндекс Форм (services/form_importers.py) — тянет публичную страницу
+# формы и парсит embedded JSON со структурой вопросов.
+httpx==0.27.2
 
 # Экспорт ответов для исследователей. openpyxl нужен для XLSX-выгрузки,
 # pandas — для подготовки прямоугольных таблиц и для pyreadstat (он
