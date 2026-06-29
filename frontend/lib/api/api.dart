@@ -83,6 +83,26 @@ class SurveysApi {
 
   Future<void> removeCollaborator(int surveyId, int userId) async =>
       c.delete('/surveys/$surveyId/collaborators/$userId');
+
+  /// Импорт структуры опроса из Google Forms / Яндекс Форм по URL.
+  /// Вопросы ДОПИСЫВАЮТСЯ в конец текущего опроса — это намеренно,
+  /// см. комментарий к эндпоинту /import на бэкенде.
+  ///
+  /// Возвращает обновлённый Survey + statisticts: сколько вопросов
+  /// реально импортировано и сколько пропущено как неподдерживаемые
+  /// (сетки, дата/время, file upload и т.п.). UI показывает эти числа
+  /// в snackbar'е после успеха, чтобы пользователь не удивлялся,
+  /// почему «8 вопросов в исходной форме, а у меня появилось 6».
+  Future<({Survey survey, String provider, int importedCount, int skippedCount})>
+      importFromUrl(int surveyId, String url) async {
+    final r = await c.post('/surveys/$surveyId/import', {'url': url}) as Map;
+    return (
+      survey: Survey.fromJson(Map<String, dynamic>.from(r['survey'])),
+      provider: r['provider']?.toString() ?? '',
+      importedCount: (r['imported_count'] as num?)?.toInt() ?? 0,
+      skippedCount: (r['skipped_count'] as num?)?.toInt() ?? 0,
+    );
+  }
 }
 
 /// Описание одного формата экспорта — для UI и для запроса.

@@ -11,6 +11,7 @@ import '../widgets/question_editor.dart';
 import '../widgets/survey_settings_panel.dart';
 import '../widgets/collaborators_dialog.dart';
 import '../widgets/share_dialog.dart';
+import '../widgets/import_dialog.dart';
 
 class BuilderScreen extends StatefulWidget {
   final int surveyId;
@@ -339,6 +340,24 @@ class _BuilderScreenState extends State<BuilderScreen> {
     showDialog(context: context, builder: (_) => ShareDialog(survey: survey!));
   }
 
+  /// Импорт структуры опроса из Google Forms / Яндекс Форм.
+  /// onImported получает обновлённый Survey (с дописанными вопросами) —
+  /// заменяем им локальное состояние, чтобы экран мгновенно отрисовал
+  /// новые вопросы без дополнительного GET.
+  void _openImport() {
+    if (survey == null) return;
+    showDialog(
+      context: context,
+      builder: (_) => ImportDialog(
+        surveyId: survey!.id,
+        onImported: (updated) {
+          if (!mounted) return;
+          setState(() => survey = updated);
+        },
+      ),
+    );
+  }
+
   /// Returns the questions on strictly earlier pages than the question at [index].
   /// Page boundaries are defined by Question.pageBreakBefore on subsequent questions.
   List<Question> _availableTriggers(int index) {
@@ -405,6 +424,11 @@ class _BuilderScreenState extends State<BuilderScreen> {
           context: context,
           builder: (_) => CollaboratorsDialog(surveyId: s.id)),
     );
+    final importBtn = IconButton(
+      icon: const Icon(Icons.cloud_download_outlined),
+      tooltip: 'Импорт из Google / Яндекс Форм',
+      onPressed: _openImport,
+    );
 
     // Кнопка публикации: на узких экранах — компактная иконка, иначе — полноценная.
     final publishWidget = published
@@ -456,6 +480,9 @@ class _BuilderScreenState extends State<BuilderScreen> {
                         context: context,
                         builder: (_) => CollaboratorsDialog(surveyId: s.id));
                     break;
+                  case 'import':
+                    _openImport();
+                    break;
                 }
               },
               itemBuilder: (_) => [
@@ -495,12 +522,22 @@ class _BuilderScreenState extends State<BuilderScreen> {
                     dense: true,
                   ),
                 ),
+                const PopupMenuItem(
+                  value: 'import',
+                  child: ListTile(
+                    leading: Icon(Icons.cloud_download_outlined),
+                    title: Text('Импорт из Google / Яндекс Форм',
+                        style: TextStyle(fontFamily: 'HSESans')),
+                    dense: true,
+                  ),
+                ),
               ],
             ),
             const SizedBox(width: 4),
           ]
         : [
             shareAction,
+            importBtn,
             previewBtn,
             analyticsBtn,
             collaboratorsBtn,

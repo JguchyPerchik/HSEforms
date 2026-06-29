@@ -79,3 +79,29 @@ class SurveyVariantOut(BaseModel):
 
 
 SurveyDetail.model_rebuild()
+
+
+class ImportFromUrlIn(BaseModel):
+    """Запрос импорта структуры опроса из внешнего конструктора.
+
+    Принимаем только URL — provider определяем по hostname на бэке,
+    чтобы фронту не нужно было знать, какой импортёр у нас сейчас
+    поддерживается. Расширение списка платформ (Survio, Typeform и т.п.)
+    — это правка только services/form_importers.py."""
+    url: str
+
+
+class ImportFromUrlOut(BaseModel):
+    """Ответ импорта. `imported_count` — сколько вопросов реально
+    создалось в нашей БД, `skipped_count` — сколько пропущено
+    как неподдерживаемые (сетки, дата/время, file upload и т.п.).
+    Эту пару полей UI показывает в snackbar'е после импорта,
+    чтобы пользователь видел честный отчёт «X вопросов добавлено,
+    Y пропущено» — а не молча получал кривой результат."""
+    provider: str
+    imported_count: int
+    skipped_count: int
+    survey: SurveyDetail
+
+
+ImportFromUrlOut.model_rebuild()

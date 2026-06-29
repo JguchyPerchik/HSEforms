@@ -15,6 +15,8 @@ from ..models import (
     Question,
 )
 from ..schemas.survey import (
+    ImportFromUrlIn,
+    ImportFromUrlOut,
     SurveyCreate,
     SurveyDetail,
     SurveySummary,
@@ -26,6 +28,8 @@ from ..core.deps import get_current_user
 from ..core.variant import rr_counter_key
 from ..redis_client import redis_client
 from ..core.permissions import get_survey_or_404, require_role
+from ..services.form_importers import FormImportError, import_from_url
+from ..models import QuestionOption
 
 
 router = APIRouter(prefix="/surveys", tags=["surveys"])
@@ -236,3 +240,91 @@ async def reset_assignment(
     # Сбрасываем счётчик у родителя — у вариантов своих счётчиков нет.
     target_id = survey.parent_survey_id or survey.id
     await redis_client.delete(rr_counter_key(target_id))
+
+
+@router.post("/{survey_id}/import", response_model=ImportFromUrlOut)
+async def import_questions(
+    survey_id: int,
+    payload: ImportFromUrlIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ImportFromUrlOut:
+    """Импортировать структуру опроса по публичной ссылке Google Forms
+    или Яндекс Форм. Вопросы ДОПИСЫВАЮТСЯ в конец текущего опроса —
+    это намеренно: пользователь может импортировать несколько разных
+    форм в один проект, или сначала набросать свои вопросы, а потом
+    подтянуть демографический блок из чужого опроса. Полная замена
+    реализуется в UI (создать новый опрос → импортировать).
+
+    Поддерживаемые типы (см. services/form_importers.py):
+      short_text, long_text, single_choice, multiple_choice,
+      dropdown, scale, section_header.
+    Всё, что не вошло в этот список (сетки, дата/время, file upload,
+    изображения, видео и т.п.) — молча пропускается, число пропусков
+    возвращается клиенту как skipped_count.
+    """
+    survey = await get_survey_or_404(db, survey_id)
+    await require_role(db, survey, user, CollabRole.editor)
+
+    try:
+        provider, _title, _desc, questions, skipped = await import_from_url(payload.url)
+    except FormImportError as e:
+        # FormImportError — это «корректно опознанная» проблема (плохой URL,
+        # форма закрыта, формат сменился). Отдаём 400 с человекочитаемым
+        # текстом, чтобы UI мог показать его в snackbar'е без оборачивания.
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+    except Exception as e:  # pragma: no cover
+        # Любая другая ошибка (httpx таймаут, неожиданный JSON) — 502:
+        # импорт зависит от внешнего сервиса, и это его сбой, а не наш.
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            f"Импорт сорвался на стороне источника: {type(e).__name__}: {e}",
+        )
+
+    # Вычисляем стартовую позицию: смотрим максимум среди текущих вопросов
+    # ОДНИМ запросом, без подтягивания всего списка в Python.
+    from sqlalchemy import func
+    last_pos_res = await db.execute(
+        select(func.max(Question.position)).where(Question.survey_id == survey_id)
+    )
+    last_pos = last_pos_res.scalar() or -1
+
+    imported_count = 0
+    for q_data in questions:
+        last_pos += 1
+        # Importer возвращает type как QuestionType enum — это уже готовый
+        # объект, не нужно ловить ValueError на неизвестных строках.
+        new_q = Question(
+            survey_id=survey_id,
+            type=q_data["type"],
+            title=q_data.get("title") or "",
+            description=q_data.get("description"),
+            position=last_pos,
+            page_break_before=bool(q_data.get("page_break_before")),
+            required=bool(q_data.get("required")),
+            config=dict(q_data.get("config") or {}),
+            display_condition=None,
+        )
+        db.add(new_q)
+        await db.flush()  # нужен id для options
+
+        for opt in q_data.get("options") or []:
+            db.add(QuestionOption(
+                question_id=new_q.id,
+                label=str(opt.get("label") or ""),
+                value=str(opt.get("value") or ""),
+                position=int(opt.get("position") or 0),
+            ))
+        imported_count += 1
+
+    await db.commit()
+
+    # Перезагружаем survey с questions+options для ответа — клиент после
+    # импорта сразу перерисовывает экран без дополнительного GET.
+    detail = await get_survey(survey_id, user, db)
+    return ImportFromUrlOut(
+        provider=provider,
+        imported_count=imported_count,
+        skipped_count=skipped,
+        survey=detail,
+    )
