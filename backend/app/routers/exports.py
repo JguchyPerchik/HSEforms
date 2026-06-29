@@ -490,6 +490,25 @@ def _sav_bytes(b: _Bundle) -> bytes:
 
     Если pyreadstat не установлен (например, в dev-окружении без C-toolchain),
     отдаём 503 с понятным сообщением — а не падаем при импорте модуля.
+
+    История падений (важно для будущих правок!):
+      1. pyreadstat капризен к dtype: object-колонка со смесью float и None
+         (например, scale-вопрос с пустыми ответами) → write_sav бросает
+         внутреннюю ошибку и Starlette показывает голый 500. Лечится
+         принудительной типизацией каждой колонки через _to_num/_to_str
+         ДО передачи в write_sav.
+      2. user_id у анонимного опроса — это столбец из одних None. Object-
+         dtype с одними None pyreadstat не умеет — нужно явно сделать его
+         numeric (станет столбцом из NaN, в SAV запишется как SYSMIS).
+      3. variable_value_labels требует, чтобы тип ключа в словаре совпадал
+         с dtype колонки в DataFrame. Если для __variant-колонки прислать
+         {0: ...} (int), а dtype вдруг object — pyreadstat падает с
+         «inconsistent value labels». Лечится финальной сверкой
+         `cleaned_value_labels` ниже.
+      4. Любой сбой записи раньше уходил как голый 500 без сообщения.
+         Теперь оборачиваем write_sav в try/except и отдаём 500 с
+         текстом исключения — следующий пользователь хотя бы поймёт,
+         какая колонка сломалась.
     """
     try:
         import pandas as pd
@@ -502,62 +521,119 @@ def _sav_bytes(b: _Bundle) -> bytes:
         )
 
     cols, rows = _build_wide(b)
-    if not rows:
-        # pyreadstat падает на пустых DataFrame — отдадим хоть header
-        df = pd.DataFrame(columns=cols)
-    else:
-        df = pd.DataFrame(rows, columns=cols)
+    df = pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
 
-    # Метки переменных (макс 256 chars в SPSS) и значений (макс 120).
     variable_labels: dict[str, str] = {
-        "response_id": "ID записи",
-        "started_at":  "Начало прохождения (UTC)",
+        "response_id":  "ID записи",
+        "started_at":   "Начало прохождения (UTC)",
         "submitted_at": "Завершение (UTC)",
-        "is_complete": "Завершён",
+        "is_complete":  "Завершён",
         "is_synthetic": "Сгенерирован AI",
-        "user_id": "ID пользователя (если не анонимный)",
-        "anon_token": "Анонимный токен",
+        "user_id":      "ID пользователя (если не анонимный)",
+        "anon_token":   "Анонимный токен",
     }
     value_labels: dict[str, dict[Any, str]] = {}
 
+    # ── Хелперы типизации ────────────────────────────────────────────
+    # pd.to_numeric с errors='coerce' превращает '' и нечисловые значения
+    # в NaN — а NaN pyreadstat правильно мапит в SPSS SYSMIS.
+    def _to_num(col: str) -> None:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Для строковых колонок None и NaN превращаем в "", иначе в SAV
+    # запишется буквальная строка "None" / "nan", что неприятно
+    # выглядит в SPSS.
+    def _to_str(col: str) -> None:
+        if col in df.columns:
+            df[col] = df[col].apply(
+                lambda v: "" if v is None or (isinstance(v, float) and pd.isna(v)) else str(v)
+            )
+
+    # ── Метаданные ──
+    for c in ("response_id", "is_complete", "is_synthetic", "user_id"):
+        _to_num(c)
+    for c in ("started_at", "submitted_at", "anon_token"):
+        _to_str(c)
+
+    # ── Колонки вопросов ──
     for q in b.questions:
         title = (q.title or f"q{q.id}")[:255]
-        if q.type.value == "multiple_choice":
+        qt = q.type.value
+        vname = _var_name(q.id)
+        vvariant = f"{vname}__variant"
+
+        if qt == "multiple_choice":
             for o in q.options:
-                vname = _var_name(q.id, o.value)
-                variable_labels[vname] = f"{title} → {(o.label or o.value)[:200]}"[:255]
-                value_labels[vname] = {0: "не выбрано", 1: "выбрано"}
-            variable_labels[_var_name(q.id)] = title
-        else:
-            vname = _var_name(q.id)
+                bn = _var_name(q.id, o.value)
+                _to_num(bn)
+                variable_labels[bn] = f"{title} → {(o.label or o.value)[:200]}"[:255]
+                value_labels[bn] = {0: "не выбрано", 1: "выбрано"}
+            # Joined-колонка из ;-разделённых значений — это строка без
+            # value-labels (несколько значений сразу метками не описать).
+            _to_str(vname)
             variable_labels[vname] = title
-            if q.options:
-                # Числовые ключи pyreadstat не любит для строковых колонок —
-                # храним label по строковому ключу, как в датафрейме.
-                value_labels[vname] = {str(o.value): (o.label or str(o.value))[:120] for o in q.options}
-        variable_labels[f"{_var_name(q.id)}__variant"] = f"Вариант, показанный респонденту: {title}"[:255]
-        value_labels[f"{_var_name(q.id)}__variant"] = {
+        elif qt == "scale":
+            _to_num(vname)
+            variable_labels[vname] = title
+        else:
+            # single_choice / dropdown / short_text / long_text — строки.
+            _to_str(vname)
+            variable_labels[vname] = title
+            if q.options and qt in ("single_choice", "dropdown"):
+                value_labels[vname] = {
+                    str(o.value): (o.label or str(o.value))[:120]
+                    for o in q.options
+                }
+
+        # variant-колонка всегда числовая (см. _variant_idx)
+        _to_num(vvariant)
+        variable_labels[vvariant] = f"Вариант, показанный респонденту: {title}"[:255]
+        value_labels[vvariant] = {
             0: "оригинал", -1: "пропущен",
             1: "вариант 1", 2: "вариант 2", 3: "вариант 3",
         }
 
-    # SPSS не любит datetime — даты у нас уже как ISO-строки, так что ок.
-    # Пустые числовые ячейки конвертим в NaN, чтобы прочиталось как SYSMIS.
-    for col in df.columns:
-        if df[col].dtype == object:
-            df[col] = df[col].where(df[col] != "", None)
+    # ── Финальная сверка value_labels с реальными dtype колонок ──
+    # pyreadstat требует, чтобы ключи value_labels были того же типа,
+    # что и значения в колонке. После _to_num/_to_str dtype определён,
+    # можно нормализовать ключи.
+    cleaned_value_labels: dict[str, dict] = {}
+    for col, labels in value_labels.items():
+        if col not in df.columns:
+            continue
+        try:
+            if pd.api.types.is_numeric_dtype(df[col]):
+                cleaned_value_labels[col] = {
+                    float(k): str(v)[:120] for k, v in labels.items()
+                }
+            else:
+                cleaned_value_labels[col] = {
+                    str(k): str(v)[:120] for k, v in labels.items()
+                }
+        except (TypeError, ValueError):
+            # Лучше отдать файл без меток для одной колонки, чем 500
+            # из-за неконвертируемого ключа.
+            continue
 
-    buf = io.BytesIO()
-    # pyreadstat пишет в файл — обходим через tempfile
     import tempfile, os
     with tempfile.NamedTemporaryFile(suffix=".sav", delete=False) as tmp:
         tmp_path = tmp.name
     try:
-        pyreadstat.write_sav(
-            df, tmp_path,
-            column_labels=[variable_labels.get(c, c) for c in df.columns],
-            variable_value_labels={k: v for k, v in value_labels.items() if k in df.columns},
-        )
+        try:
+            pyreadstat.write_sav(
+                df, tmp_path,
+                column_labels=[variable_labels.get(c, c) for c in df.columns],
+                variable_value_labels=cleaned_value_labels,
+            )
+        except Exception as e:
+            # Конвертируем внутреннее исключение pyreadstat в осмысленный
+            # HTTP-ответ: пользователь хотя бы поймёт, что именно пошло
+            # не так (раньше получал голый 500 без тела).
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                f"Не удалось сформировать SPSS-файл: {type(e).__name__}: {e}",
+            )
         with open(tmp_path, "rb") as f:
             return f.read()
     finally:
